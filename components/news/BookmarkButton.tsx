@@ -1,57 +1,75 @@
 /**
- * server/actions/bookmarks.ts
- * Toggle bookmark notizia. Richiede autenticazione.
+ * components/news/BookmarkButton.tsx
+ * Bookmark con optimistic UI + toast. Funziona solo se loggato.
  */
-'use server';
+'use client';
 
-import { revalidateTag } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
-import { errorMessage } from '@/lib/utils';
+import { useState, useTransition } from 'react';
+import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { toggleBookmark } from '@/server/actions/bookmarks';
+import { cn } from '@/lib/utils';
 
-export type ActionResult<T = unknown> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
+interface Props {
+  newsId: string;
+  initialBookmarked: boolean;
+  variant?: 'inline' | 'floating';
+}
 
-export async function toggleBookmark(
-  newsId: string,
-): Promise<ActionResult<{ bookmarked: boolean }>> {
-  if (!newsId || typeof newsId !== 'string') {
-    return { ok: false, error: 'invalid_id' };
-  }
+export function BookmarkButton({ newsId, initialBookmarked, variant = 'inline' }: Props) {
+  const router = useRouter();
+  const [bookmarked, setBookmarked] = useState(initialBookmarked);
+  const [isPending, startTransition] = useTransition();
 
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { ok: false, error: 'not_authenticated' };
+  function handleClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
 
-    const { data: existing } = await supabase
-      .from('news_bookmarks')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .eq('news_id', newsId)
-      .maybeSingle();
+    // Optimistic flip
+    const next = !bookmarked;
+    setBookmarked(next);
 
-    if (existing) {
-      const { error } = await supabase
-        .from('news_bookmarks')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('news_id', newsId);
-      if (error) return { ok: false, error: error.message };
-      revalidateTag(`bookmarks:${user.id}`);
-      return { ok: true, data: { bookmarked: false } };
-    }
+    startTransition(async () => {
+      const result = await toggleBookmark(newsId);
 
-    const { error } = await supabase.from('news_bookmarks').insert({
-      user_id: user.id,
-      news_id: newsId,
+      if (!result.ok) {
+        // Rollback
+        setBookmarked(!next);
+        if (result.error === 'not_authenticated') {
+          toast.error('Devi accedere per salvare le notizie.', {
+            action: { label: 'Accedi', onClick: () => router.push('/login') },
+          });
+        } else {
+          toast.error('Errore nel salvataggio.');
+        }
+        return;
+      }
+
+      toast.success(next ? 'Notizia salvata' : 'Notizia rimossa', { duration: 1500 });
     });
-    if (error) return { ok: false, error: error.message };
-    revalidateTag(`bookmarks:${user.id}`);
-    return { ok: true, data: { bookmarked: true } };
-  } catch (err) {
-    return { ok: false, error: errorMessage(err) };
   }
+
+  const Icon = bookmarked ? BookmarkCheck : Bookmark;
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isPending}
+      aria-label={bookmarked ? 'Rimuovi dai preferiti' : 'Salva'}
+      className={cn(
+        'transition disabled:opacity-50',
+        variant === 'floating'
+          ? 'rounded-full bg-otc-bg/70 p-2 backdrop-blur hover:bg-otc-accent hover:text-black'
+          : 'rounded-md p-1.5 hover:bg-otc-surface-2',
+        bookmarked
+          ? 'text-otc-accent'
+          : variant === 'floating'
+            ? 'text-white'
+            : 'text-otc-text-3 hover:text-otc-accent',
+      )}
+    >
+      <Icon className="h-4 w-4" strokeWidth={bookmarked ? 2.5 : 2} />
+    </button>
+  );
 }
