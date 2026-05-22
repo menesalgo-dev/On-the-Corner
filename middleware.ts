@@ -1,76 +1,52 @@
 /**
- * middleware.ts — Versione bulletproof.
+ * middleware.ts — Versione Edge-compatibile MINIMALE.
  *
- * Cambiamenti:
- *  - try/catch globale: se qualcosa esplode, lascia passare la richiesta
- *    invece di tornare 500. Loggiamo per Vercel Logs.
- *  - Validazione env vars con fallback esplicito.
- *  - Matcher più stretto: salta /auth/callback e altre rotte che non
- *    devono mai essere intercettate.
- *  - getUser() in try/catch dedicato per cookie corrotti.
+ * Non usa @supabase/ssr (che in alcune build interne ha __dirname
+ * incompatibile con Edge Runtime). Invece controlla manualmente la
+ * presenza del cookie di sessione Supabase.
+ *
+ * Questo NON refresha il token, ma:
+ *  - Permette il routing protected/auth
+ *  - Funziona al 100% in Edge Runtime
+ *  - Il refresh sessione viene fatto comunque dal client Supabase nelle
+ *    Server Actions e Route Handlers quando serve.
  */
 import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 const PROTECTED_PATHS = ['/dashboard', '/slips', '/profile', '/follow'];
 const AUTH_PATHS = ['/login', '/signup'];
 
-export async function middleware(request: NextRequest) {
-  // Fallback se le env mancano
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    console.error('[middleware] Missing Supabase env vars. Skipping auth refresh.');
-    return NextResponse.next({ request });
+/**
+ * Cerca un cookie di sessione Supabase tra quelli presenti.
+ * I cookie di Supabase iniziano con `sb-` e finiscono con `-auth-token`.
+ */
+function hasSupabaseSession(request: NextRequest): boolean {
+  const cookies = request.cookies.getAll();
+  return cookies.some(
+    (c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token') && c.value.length > 10,
+  );
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isLoggedIn = hasSupabaseSession(request);
+
+  // Route protette: redirect a /login se non loggato
+  if (PROTECTED_PATHS.some((p) => pathname.startsWith(p)) && !isLoggedIn) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(url);
   }
 
-  let response = NextResponse.next({ request });
-
-  try {
-    const supabase = createServerClient(url, anonKey, {
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll: (cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) => {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
-        },
-      },
-    });
-
-    // getUser() puo' lanciare se i cookie sono corrotti
-    let user = null;
-    try {
-      const { data } = await supabase.auth.getUser();
-      user = data.user;
-    } catch (err) {
-      console.warn('[middleware] getUser failed:', (err as Error).message);
-    }
-
-    const { pathname } = request.nextUrl;
-
-    if (PROTECTED_PATHS.some((p) => pathname.startsWith(p)) && !user) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = '/login';
-      redirectUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    if (AUTH_PATHS.some((p) => pathname.startsWith(p)) && user) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = '/';
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    return response;
-  } catch (err) {
-    console.error('[middleware] Unhandled error:', err);
-    return NextResponse.next({ request });
+  // Route auth: redirect alla home se gia' loggato
+  if (AUTH_PATHS.some((p) => pathname.startsWith(p)) && isLoggedIn) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    return NextResponse.redirect(url);
   }
+
+  return NextResponse.next();
 }
 
 export const config = {
