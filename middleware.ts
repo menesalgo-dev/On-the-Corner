@@ -1,15 +1,24 @@
 /**
- * middleware.ts — Versione Edge-compatibile MINIMALE.
+ * middleware.ts
  *
- * Non usa @supabase/ssr (che in alcune build interne ha __dirname
- * incompatibile con Edge Runtime). Invece controlla manualmente la
- * presenza del cookie di sessione Supabase.
+ * Versione Edge-safe: controlla manualmente la presenza del cookie
+ * di sessione Supabase senza importare @supabase/ssr.
  *
- * Questo NON refresha il token, ma:
- *  - Permette il routing protected/auth
- *  - Funziona al 100% in Edge Runtime
- *  - Il refresh sessione viene fatto comunque dal client Supabase nelle
- *    Server Actions e Route Handlers quando serve.
+ * Perche': @supabase/ssr@0.5.x contiene internamente riferimenti a
+ * __dirname che esplodono in Edge Runtime di Vercel. La doc ufficiale
+ * Supabase sconsiglia infatti di usare createServerClient nel middleware
+ * Edge. Il refresh token avviene comunque nelle Server Actions e
+ * Route Handlers quando serve.
+ *
+ * Cosa fa questo middleware:
+ *  - Controlla se l'utente ha un cookie sessione Supabase valido
+ *  - Se accede a route protette senza sessione -> redirect /login
+ *  - Se accede a /login o /signup gia' loggato -> redirect /
+ *  - Tutte le altre rotte (/, /news, /live, ecc) passano sempre
+ *
+ * Architettura accessi:
+ *  - Aperte a tutti: /, /news, /news/[id], /live, /live/[id]
+ *  - Protette (richiedono login): /dashboard, /slips, /profile, /follow
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -17,8 +26,8 @@ const PROTECTED_PATHS = ['/dashboard', '/slips', '/profile', '/follow'];
 const AUTH_PATHS = ['/login', '/signup'];
 
 /**
- * Cerca un cookie di sessione Supabase tra quelli presenti.
- * I cookie di Supabase iniziano con `sb-` e finiscono con `-auth-token`.
+ * Verifica presenza cookie sessione Supabase.
+ * I cookie auth di Supabase iniziano con `sb-` e finiscono con `-auth-token`.
  */
 function hasSupabaseSession(request: NextRequest): boolean {
   const cookies = request.cookies.getAll();
@@ -31,7 +40,6 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isLoggedIn = hasSupabaseSession(request);
 
-  // Route protette: redirect a /login se non loggato
   if (PROTECTED_PATHS.some((p) => pathname.startsWith(p)) && !isLoggedIn) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
@@ -39,7 +47,6 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Route auth: redirect alla home se gia' loggato
   if (AUTH_PATHS.some((p) => pathname.startsWith(p)) && isLoggedIn) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
