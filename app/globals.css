@@ -1,79 +1,68 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme {
-  --color-otc-bg:         #080808;
-  --color-otc-surface:    #0d0d0d;
-  --color-otc-surface-2:  #141414;
-  --color-otc-line:       #1f1f1f;
-  --color-otc-text:       #ffffff;
-  --color-otc-text-2:     #a1a1a6;
-  --color-otc-text-3:     #6b6b70;
-  --color-otc-accent:     #e8c800;
-  --color-otc-accent-2:   #ffe25a;
-  --color-otc-danger:     #ef4444;
-
-  --font-display: var(--font-archivo-black);
-  --font-sans:    var(--font-inter);
-  --font-mono:    var(--font-dm-mono);
-
-  --shadow-glow:    0 0 24px rgba(232, 200, 0, 0.35);
-  --shadow-glow-lg: 0 0 48px rgba(232, 200, 0, 0.55);
-}
-
-/* ─── Base ─── */
-html, body {
-  background: var(--color-otc-bg);
-  color: var(--color-otc-text);
-}
-
-body {
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
-  -webkit-tap-highlight-color: transparent;
-  text-rendering: optimizeLegibility;
-}
-
-/* ─── Selezione testo ─── */
-::selection {
-  background: var(--color-otc-accent);
-  color: #000;
-}
-
-/* ─── Scrollbar custom (desktop) ─── */
-@media (pointer: fine) {
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: var(--color-otc-bg); }
-  ::-webkit-scrollbar-thumb {
-    background: var(--color-otc-line);
-    border-radius: 999px;
-    border: 2px solid var(--color-otc-bg);
+@layer base {
+  :root {
+    --color-bg: #080808;
+    --color-surface: #0d0d0d;
+    --color-surface-2: #141414;
+    --color-line: #1f1f1f;
+    --color-text: #ffffff;
+    --color-text-2: #a1a1a6;
+    --color-text-3: #6b6b70;
+    --color-accent: #e8c800;
+    --color-accent-2: #ffe25a;
+    --color-danger: #ef4444;
   }
-  ::-webkit-scrollbar-thumb:hover { background: #2a2a2a; }
+
+  html,
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  body {
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: #000;
+  }
+
+  @media (pointer: fine) {
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background-color: var(--color-bg);
+    }
+    ::-webkit-scrollbar-thumb {
+      background-color: var(--color-line);
+      border-radius: 999px;
+      border: 2px solid var(--color-bg);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: #2a2a2a;
+    }
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
-/* ─── Focus visible coerente con il brand ─── */
-*:focus-visible {
-  outline: 2px solid var(--color-otc-accent);
-  outline-offset: 2px;
-  border-radius: 4px;
+@layer utilities {
+  .text-display {
+    font-family: var(--font-archivo-black), system-ui, sans-serif;
+  }
+  .text-mono {
+    font-family: var(--font-dm-mono), ui-monospace, monospace;
+  }
 }
-
-/* ─── Animazioni globali ─── */
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 rgba(232,200,0,0); }
-  50%      { box-shadow: 0 0 24px rgba(232,200,0,0.55); }
-}
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: .4; transform: scale(.8); }
-}
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-/* utility classes */
-.text-display { font-family: var(--font-display); }
-.text-mono    { font-family: var(--font-mono); }
-.text-accent  { color: var(--color-otc-accent); }
-.bg-accent    { background-color: var(--color-otc-accent); }
-.shadow-glow  { box-shadow: var(--shadow-glow); }
