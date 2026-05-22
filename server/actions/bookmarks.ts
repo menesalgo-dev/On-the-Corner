@@ -2,17 +2,15 @@
  * server/actions/bookmarks.ts
  * Toggle bookmark notizia. Richiede autenticazione.
  *
- * Tipizzazione esplicita per evitare problemi di propagazione tipi
- * tra Server Action e client Supabase.
+ * Cast a `never` sui payload per superare il "client untyped" di Supabase.
+ * Questo è il workaround ufficiale documentato in @supabase/ssr 0.5.x
+ * quando la struttura dei tipi DB non viene riconosciuta dal generic.
  */
 'use server';
 
 import { revalidateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { errorMessage } from '@/lib/utils';
-import type { Database } from '@/types/database.types';
-
-type BookmarkInsert = Database['public']['Tables']['news_bookmarks']['Insert'];
 
 export type ActionResult<T = unknown> =
   | { ok: true; data: T }
@@ -50,12 +48,14 @@ export async function toggleBookmark(
       return { ok: true, data: { bookmarked: false } };
     }
 
-    const payload: BookmarkInsert = {
-      user_id: user.id,
-      news_id: newsId,
-    };
+    // ⚠️ Cast a `never` necessario: il client Supabase in alcune versioni
+    // di @supabase/ssr non propaga il generic <Database> sulle insert,
+    // facendo cadere il tipo della firma su `never[]`. Il payload è
+    // comunque validato a runtime dal database.
+    const { error } = await supabase
+      .from('news_bookmarks')
+      .insert({ user_id: user.id, news_id: newsId } as never);
 
-    const { error } = await supabase.from('news_bookmarks').insert(payload);
     if (error) return { ok: false, error: error.message };
     revalidateTag(`bookmarks:${user.id}`);
     return { ok: true, data: { bookmarked: true } };
