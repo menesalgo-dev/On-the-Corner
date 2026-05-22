@@ -1,10 +1,10 @@
 /**
  * lib/supabase/server.ts
- * Client Supabase per Server Components, Server Actions e Route Handlers.
- * Legge/scrive cookie di sessione via cookies() di Next.js.
+ * Client Supabase per Server Components, Server Actions, Route Handlers.
+ * VERSIONE FIX: tipi espliciti per evitare errori in strict mode.
  */
 import 'server-only';
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/database.types';
 
@@ -19,13 +19,13 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options),
             );
           } catch {
-            // Setter chiamato da un Server Component: ignorato.
+            // Setter chiamato da Server Component: ignorato.
             // Il middleware si occupa di refreshare la sessione.
           }
         },
