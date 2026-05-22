@@ -1,10 +1,12 @@
 /**
  * next.config.mjs
- * Compatibile con Next.js 14. Sostituisce il vecchio next.config.ts.
  *
- * Le immagini delle news arrivano da 20+ domini diversi (uno per fonte RSS),
- * quindi qui ne whitelist-iamo i principali. Se vedi warning "hostname not
- * configured" su un dominio nuovo, aggiungilo a `remotePatterns`.
+ * ⚠️ Next 14 NON supporta next.config.ts → usa .mjs.
+ * (Il supporto .ts è arrivato in Next 15.)
+ *
+ * Note:
+ *  - `remotePatterns` permette di ottimizzare immagini dai domini dei feed RSS.
+ *  - Le redirect 301 servono per la migrazione SEO da Hostinger.
  */
 
 /** @type {import('next').NextConfig} */
@@ -19,7 +21,7 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
-      // ── Italiane ──
+      // Italiane
       { protocol: 'https', hostname: '**.gazzetta.it' },
       { protocol: 'https', hostname: '**.corrieredellosport.it' },
       { protocol: 'https', hostname: '**.sky.it' },
@@ -32,7 +34,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.ansa.it' },
       { protocol: 'https', hostname: '**.calciomercato.com' },
       { protocol: 'https', hostname: '**.formulapassion.it' },
-      // ── Estere ──
+      // Estere
       { protocol: 'https', hostname: '**.bbci.co.uk' },
       { protocol: 'https', hostname: '**.bbc.co.uk' },
       { protocol: 'https', hostname: '**.formula1.com' },
@@ -42,7 +44,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.epimg.net' },
       { protocol: 'https', hostname: '**.uefa.com' },
       { protocol: 'https', hostname: '**.atptour.com' },
-      // ── Avatar Supabase / Google ──
+      // Avatar Supabase / Google
       { protocol: 'https', hostname: '*.supabase.co' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
@@ -50,7 +52,7 @@ const nextConfig = {
 
   async redirects() {
     return [
-      // Migrazione SEO dal vecchio Hostinger — sostituisci con i tuoi path reali
+      // Migrazione da Hostinger — aggiungi qui i tuoi vecchi path
       // { source: '/news/calcio', destination: '/news?source=g', permanent: true },
       // { source: '/partite-oggi', destination: '/live', permanent: true },
     ];
