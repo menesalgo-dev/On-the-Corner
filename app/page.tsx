@@ -1,199 +1,78 @@
 /**
- * app/page.tsx — Homepage di On The Corner (Settimana 2).
- * Server Component: legge le news dal DB, mostra hero + grid + sidebar.
+ * app/page.tsx — Homepage di On The Corner.
+ *
+ * Versione landing semplice senza dipendenze da Supabase.
+ * Quando vorrai mostrare le notizie dal DB, sostituirai con la
+ * versione della Settimana 2 (server component).
  */
 import Link from 'next/link';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
-import { NewsCard, NewsCardSkeleton } from '@/components/news/NewsCard';
-import { fetchLatestNews, fetchUserBookmarkIds, fetchNewsStats } from '@/lib/news';
-import { Suspense } from 'react';
 
-// Revalidate ogni 5 minuti — combacia con la frequenza media del cron RSS.
-export const revalidate = 300;
-
-export default async function HomePage() {
+export default function HomePage() {
   return (
-    <>
-      <Header />
+    <main className="min-h-dvh">
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10"
+          style={{
+            background:
+              'radial-gradient(circle at 20% 30%, rgba(232,200,0,0.15), transparent 50%), radial-gradient(circle at 80% 70%, rgba(232,200,0,0.08), transparent 50%)',
+          }}
+        />
 
-      <main className="mx-auto max-w-[1320px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12">
-        <Suspense fallback={<HomePageSkeleton />}>
-          <HomePageContent />
-        </Suspense>
-      </main>
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-center px-6 py-24 text-center sm:py-32">
+          {/* Logo bandierina */}
+          <svg
+            width="64"
+            height="64"
+            viewBox="0 0 64 64"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-label="On The Corner logo"
+            role="img"
+            className="mb-8"
+          >
+            <path d="M 8 56 Q 8 22 42 22" stroke="#e8c800" strokeWidth="3.5" strokeLinecap="round" fill="none"/>
+            <line x1="42" y1="22" x2="42" y2="56" stroke="#e8c800" strokeWidth="3.5" strokeLinecap="round"/>
+            <path d="M 42 22 L 60 26 L 42 34 Z" fill="#e8c800"/>
+            <line x1="6" y1="58" x2="58" y2="58" stroke="#e8c800" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
+          </svg>
 
-      <BottomNav />
-    </>
-  );
-}
-
-async function HomePageContent() {
-  const [news, bookmarks, stats] = await Promise.all([
-    fetchLatestNews(25),
-    fetchUserBookmarkIds(),
-    fetchNewsStats(),
-  ]);
-
-  // Stato vuoto: nessuna notizia ancora nel DB.
-  if (news.length === 0) {
-    return <EmptyState />;
-  }
-
-  const [hero, ...rest] = news;
-
-  return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
-      {/* CENTRO */}
-      <div className="space-y-6">
-        {/* HERO */}
-        {hero && (
-          <NewsCard
-            news={hero}
-            isBookmarked={bookmarks.has(hero.id)}
-            variant="hero"
-          />
-        )}
-
-        {/* In evidenza */}
-        <SectionHeader title="In Evidenza" linkHref="/news" linkLabel="Tutte →" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rest.map((item) => (
-            <NewsCard
-              key={item.id}
-              news={item}
-              isBookmarked={bookmarks.has(item.id)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* SIDEBAR (solo lg+) */}
-      <aside className="hidden space-y-4 lg:block">
-        <SidebarPanel title="Statistiche">
-          <div className="grid grid-cols-2 gap-3">
-            <Stat value={stats.total} label="Notizie" />
-            <Stat value={stats.sources.length} label="Fonti attive" highlight />
-          </div>
-        </SidebarPanel>
-
-        <SidebarPanel title="Fonti">
-          <ul className="space-y-2.5 text-sm">
-            {stats.sources.slice(0, 12).map((s) => (
-              <li key={s.id} className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      s.count >= 5
-                        ? 'bg-emerald-500 shadow-[0_0_6px_currentColor]'
-                        : s.count > 0
-                          ? 'bg-otc-accent'
-                          : 'bg-otc-danger'
-                    }`}
-                  />
-                  <span className="text-otc-text">{s.name}</span>
-                </span>
-                <span className="font-mono text-xs tabular-nums text-otc-text-2">
-                  {s.count}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </SidebarPanel>
-
-        <SidebarPanel title="Seguiti">
-          <p className="text-center text-xs text-otc-text-3">
-            Non segui ancora nulla.
-            <br />
-            <Link href="/follow" className="mt-2 inline-block font-mono uppercase tracking-wider text-otc-accent hover:underline">
-              Scopri squadre →
-            </Link>
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#e8c800]">
+            v1.0 - in costruzione
           </p>
-        </SidebarPanel>
-      </aside>
-    </div>
-  );
-}
 
-function SectionHeader({ title, linkHref, linkLabel }: { title: string; linkHref: string; linkLabel: string }) {
-  return (
-    <div className="flex items-baseline justify-between">
-      <h2 className="font-display text-base uppercase tracking-tight sm:text-lg">
-        In <span className="text-otc-accent">Evidenza</span>
-      </h2>
-      <Link
-        href={linkHref}
-        className="font-mono text-[11px] uppercase tracking-widest text-otc-text-2 transition hover:text-otc-accent"
-      >
-        {linkLabel}
-      </Link>
-    </div>
-  );
-}
+          <h1 className="mt-6 text-5xl uppercase leading-[0.95] tracking-tight sm:text-7xl" style={{ fontFamily: 'var(--font-archivo-black, sans-serif)' }}>
+            On The <span className="text-[#e8c800]">Corner</span>
+          </h1>
 
-function SidebarPanel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-otc-line bg-otc-surface p-5">
-      <h3 className="mb-4 flex items-center gap-3 font-display text-[10px] uppercase tracking-[0.15em] text-otc-text-3">
-        {title}
-        <span className="h-px flex-1 bg-otc-line" />
-      </h3>
-      {children}
-    </section>
-  );
-}
+          <p className="mt-6 max-w-2xl text-lg text-zinc-400 sm:text-xl">
+            Sport, schedine e notizie in tempo reale.<br />
+            <span className="text-zinc-300">L'evoluzione definitiva.</span>
+          </p>
 
-function Stat({ value, label, highlight }: { value: number; label: string; highlight?: boolean }) {
-  return (
-    <div className="rounded-xl border border-otc-line bg-otc-surface-2 p-3">
-      <div
-        className={`font-display text-2xl leading-none ${
-          highlight ? 'text-otc-accent' : 'text-white'
-        }`}
-        style={highlight ? { textShadow: '0 0 18px rgba(232,200,0,0.4)' } : {}}
-      >
-        {value}
-      </div>
-      <div className="mt-1.5 font-mono text-[10px] uppercase tracking-widest text-otc-text-2">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function HomePageSkeleton() {
-  return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
-      <div className="space-y-6">
-        <NewsCardSkeleton variant="hero" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <NewsCardSkeleton key={i} />
-          ))}
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/login"
+              className="rounded-xl bg-[#e8c800] px-6 py-3 text-sm uppercase tracking-wider text-black shadow-[0_0_24px_rgba(232,200,0,0.35)] transition hover:scale-[1.02] hover:shadow-[0_0_36px_rgba(232,200,0,0.55)]"
+              style={{ fontFamily: 'var(--font-archivo-black, sans-serif)' }}
+            >
+              Entra
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-6 py-3 text-sm uppercase tracking-wider text-white transition hover:border-[#e8c800]/40 hover:text-[#e8c800]"
+              style={{ fontFamily: 'var(--font-archivo-black, sans-serif)' }}
+            >
+              Registrati
+            </Link>
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      </section>
 
-function EmptyState() {
-  return (
-    <div className="mx-auto max-w-md rounded-3xl border border-otc-line bg-otc-surface p-10 text-center">
-      <div className="mb-4 text-5xl">📰</div>
-      <h2 className="mb-2 font-display text-xl uppercase">Niente notizie ancora</h2>
-      <p className="text-sm text-otc-text-2">
-        L'aggregatore RSS sta lavorando. Le notizie compaiono qui automaticamente,
-        di solito entro 15 minuti dalla prima esecuzione del cron.
-      </p>
-      <div className="mt-6 rounded-xl border border-otc-line bg-otc-surface-2 p-4 text-left">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-otc-text-3">
-          Come popolare il DB
-        </div>
-        <p className="font-mono text-xs text-otc-text-2">
-          Esegui manualmente la Edge Function <span className="text-otc-accent">sync-news</span>
-          {' '}da Supabase Dashboard, oppure attendi il prossimo ciclo del cron.
-        </p>
-      </div>
-    </div>
+      <footer className="border-t border-zinc-900 px-6 py-10 text-center font-mono text-xs uppercase tracking-widest text-zinc-600">
+        (c) {new Date().getFullYear()} On The Corner
+      </footer>
+    </main>
   );
 }
