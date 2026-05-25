@@ -1,11 +1,43 @@
 /**
  * app/page.tsx — Homepage di On The Corner.
- *
- * Versione landing semplice senza dipendenze da Supabase.
- * Quando vorrai mostrare le notizie dal DB, sostituirai con la
- * versione della Settimana 2 (server component).
+ * Con bypass "Entra come Test User"
  */
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+
+async function enterAsTestUser() {
+  'use server';
+  
+  const supabase = await createClient();
+  const testEmail = 'test@on-the-corner.it';
+  const testPassword = '12345678';
+
+  // Prova login
+  let { error } = await supabase.auth.signInWithPassword({
+    email: testEmail,
+    password: testPassword,
+  });
+
+  // Se non esiste, crealo
+  if (error) {
+    await supabase.auth.signUp({
+      email: testEmail,
+      password: testPassword,
+      options: {
+        data: { username: 'testuser', full_name: 'Test User' },
+      },
+    });
+
+    // Login dopo creazione
+    await supabase.auth.signInWithPassword({
+      email: testEmail,
+      password: testPassword,
+    });
+  }
+
+  redirect('/'); // Resta sulla home (o cambia con la tua dashboard)
+}
 
 export default function HomePage() {
   return (
@@ -19,7 +51,6 @@ export default function HomePage() {
               'radial-gradient(circle at 20% 30%, rgba(232,200,0,0.15), transparent 50%), radial-gradient(circle at 80% 70%, rgba(232,200,0,0.08), transparent 50%)',
           }}
         />
-
         <div className="mx-auto flex max-w-5xl flex-col items-center justify-center px-6 py-24 text-center sm:py-32">
           {/* Logo bandierina */}
           <svg
@@ -41,24 +72,26 @@ export default function HomePage() {
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#e8c800]">
             v1.0 - in costruzione
           </p>
-
           <h1 className="mt-6 text-5xl uppercase leading-[0.95] tracking-tight sm:text-7xl" style={{ fontFamily: 'var(--font-archivo-black, sans-serif)' }}>
             On The <span className="text-[#e8c800]">Corner</span>
           </h1>
-
           <p className="mt-6 max-w-2xl text-lg text-zinc-400 sm:text-xl">
             Sport, schedine e notizie in tempo reale.<br />
             <span className="text-zinc-300">L'evoluzione definitiva.</span>
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/login"
-              className="rounded-xl bg-[#e8c800] px-6 py-3 text-sm uppercase tracking-wider text-black shadow-[0_0_24px_rgba(232,200,0,0.35)] transition hover:scale-[1.02] hover:shadow-[0_0_36px_rgba(232,200,0,0.55)]"
-              style={{ fontFamily: 'var(--font-archivo-black, sans-serif)' }}
-            >
-              Entra
-            </Link>
+            {/* Bottone ENTRA con bypass */}
+            <form action={enterAsTestUser}>
+              <button
+                type="submit"
+                className="rounded-xl bg-[#e8c800] px-8 py-3 text-sm uppercase tracking-wider text-black shadow-[0_0_24px_rgba(232,200,0,0.35)] transition hover:scale-[1.02] hover:shadow-[0_0_36px_rgba(232,200,0,0.55)]"
+                style={{ fontFamily: 'var(--font-archivo-black, sans-serif)' }}
+              >
+                Entra
+              </button>
+            </form>
+
             <Link
               href="/signup"
               className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-6 py-3 text-sm uppercase tracking-wider text-white transition hover:border-[#e8c800]/40 hover:text-[#e8c800]"
