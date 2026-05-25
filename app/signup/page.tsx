@@ -16,7 +16,7 @@ export default async function SignupPage({ searchParams }: PageProps) {
 
   async function signupAction(formData: FormData) {
     'use server';
-
+    
     const email = String(formData.get('email') ?? '').trim();
     const password = String(formData.get('password') ?? '');
     const username = String(formData.get('username') ?? '').trim();
@@ -26,17 +26,20 @@ export default async function SignupPage({ searchParams }: PageProps) {
     }
 
     const supabase = await createClient();
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { username, full_name: username },
+        emailRedirectTo: 'https://on-the-corner.vercel.app/auth/callback',
       },
     });
 
     if (error) {
       redirect(`/signup?error=${encodeURIComponent(error.message)}`);
     }
+
     redirect('/signup?sent=1');
   }
 
@@ -68,8 +71,22 @@ export default async function SignupPage({ searchParams }: PageProps) {
               )}
 
               <form action={signupAction} className="mt-6 space-y-4">
-                <Field label="Username" name="username" placeholder="es. luca99" minLength={3} maxLength={24} required />
-                <Field label="Email" name="email" type="email" placeholder="tu@esempio.it" autoComplete="email" required />
+                <Field 
+                  label="Username" 
+                  name="username" 
+                  placeholder="es. luca99" 
+                  minLength={3} 
+                  maxLength={24} 
+                  required 
+                />
+                <Field 
+                  label="Email" 
+                  name="email" 
+                  type="email" 
+                  placeholder="tu@esempio.it" 
+                  autoComplete="email" 
+                  required 
+                />
                 <Field
                   label="Password (min 8 caratteri)"
                   name="password"
@@ -78,7 +95,6 @@ export default async function SignupPage({ searchParams }: PageProps) {
                   minLength={8}
                   required
                 />
-
                 <button
                   type="submit"
                   className="w-full rounded-xl bg-[#e8c800] py-3 font-[var(--font-archivo-black)] text-sm uppercase tracking-wider text-black transition hover:scale-[1.01] hover:shadow-[0_0_36px_rgba(232,200,0,0.45)]"
@@ -126,7 +142,10 @@ function SuccessState() {
 }
 
 function Field({
-  label, name, type = 'text', ...rest
+  label,
+  name,
+  type = 'text',
+  ...rest
 }: { label: string; name: string; type?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
