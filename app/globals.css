@@ -14,10 +14,10 @@
     --color-accent: #e8c800;
     --color-accent-2: #ffe25a;
     --color-danger: #ef4444;
+    --color-success: #22c55e;
   }
 
-  html,
-  body {
+  html, body {
     background-color: var(--color-bg);
     color: var(--color-text);
   }
@@ -65,4 +65,25 @@
   .text-mono {
     font-family: var(--font-dm-mono), ui-monospace, monospace;
   }
+  .scrollbar-hide {
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .4; transform: scale(.85); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
