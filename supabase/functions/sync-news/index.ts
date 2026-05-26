@@ -1,128 +1,119 @@
 /**
- * supabase/functions/sync-news/index.ts
- * Edge Function Deno che aggrega tutti gli RSS configurati e popola la
- * tabella `news_items`. Eseguita ogni 15 minuti via pg_cron.
- *
- * Nota: il parser è duplicato nel modulo `lib/rss` lato Next.js perché
- * Deno e Node hanno path diversi. Mantieni le due copie allineate, oppure
- * sposta `lib/rss` in un pacchetto npm condiviso (`packages/rss`).
- *
- * Deploy:
- *   supabase functions deploy sync-news --no-verify-jwt
- * Invocazione manuale (debug):
- *   curl -X POST https://<PROJECT>.supabase.co/functions/v1/sync-news \
- *        -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+ * sync-news - Versione Unica per Dashboard Supabase
+ * Tutto in un solo file - Senza import esterni
  */
 
-// @ts-ignore — Deno std
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-
-import { aggregateAllFeeds, type NewsItem } from './_parser.ts';
-import { MAX_AGE_DAYS } from './_config.ts';
+import { XMLParser } from 'npm:fast-xml-parser@4.4.1';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 if (!SUPABASE_URL || !SERVICE_ROLE) {
-  throw new Error('Missing env: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
+  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
 }
 
 const supa = createClient(SUPABASE_URL, SERVICE_ROLE, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-interface NewsRow {
-  hash: string;
-  source_id: string;
-  source_name: string;
-  title: string;
-  link: string;
-  description: string | null;
-  image_url: string | null;
-  lang: 'it' | 'en';
-  priority: number;
-  published_at: string;
-  tags: string[];
+const MAX_AGE_DAYS = 7;
+
+const FEEDS = [
+  { name: "Repubblica", url: "https://www.repubblica.it/rss/homepage/rss2.0.xml" },
+  { name: "Corriere della Sera", url: "https://www.corriere.it/rss/homepage/rss2.0.xml" },
+  { name: "ANSA", url: "https://www.ansa.it/sito/notizie/topnews/topnews_rss.xml" },
+  { name: "Il Sole 24 Ore", url: "https://www.ilsole24ore.com/rss/homepage/rss2.0.xml" },
+  { name: "La Stampa", url: "https://www.lastampa.it/rss.xml" },
+  { name: "Il Post", url: "https://www.ilpost.it/feed/" },
+];
+
+async function fetchAndParseFeed(feed: { name: string; url: string }) {
+  try {
+    const response = await fetch(feed.url, { 
+      headers: { 'User-Agent': 'Mozilla/5.0' } 
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const xmlText = await response.text();
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: "@_",
+      isArray: (tagName) => tagName === 'item' || tagName === 'entry',
+    });
+
+    const parsed = parser.parse(xmlText);
+    const channel = parsed.rss?.channel || parsed.feed;
+    const items = channel?.item  channel?.entry  [];
+
+    return items.map((item: any) => {
+      const title = item.title?.['#text']  item.title  "Senza titolo";
+      const link = item.link?.['@_href']  item.link?.['#text']  item.link;
+      const description = item.description?.['#text']  item.description  item.summary;
+      const pubDate = item.pubDate  item.published  item.updated;
+
+      return {
+        hash: btoa(encodeURI(title + (typeof link === 'string' ? link : ''))).slice(0, 32),
+        source_id: feed.name.toLowerCase().replace(/\s+/g, '-'),
+        source_name: feed.name,
+        title: String(title).slice(0, 500),
+        link: typeof link === 'string' ? link.trim() : "",
+        description: description ? String(description).slice(0, 1000) : null,
+        image_url: null,
+        lang: 'it',
+        priority: 50,
+        published_at: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        tags: [],
+      };
+    }).filter(item => item.link);
+
+  } catch (error) {
+    console.error(`Errore nel feed ${feed.name}:`, error);
+    return [];
+  }
 }
 
-function toRow(n: NewsItem): NewsRow {
-  return {
-    hash: n.hash,
-    source_id: n.sourceId,
-    source_name: n.sourceName,
-    title: n.title.slice(0, 500),
-    link: n.link,
-    description: n.description ? n.description.slice(0, 1000) : null,
-    image_url: n.imageUrl,
-    lang: n.lang,
-    priority: n.priority,
-    published_at: n.publishedAt,
-    tags: n.tags,
-  };
-}
-
-// ───────────────────  CHUNK helper (batch insert)  ───────────────────
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}
-
-// ──────────────────────────────  Handler  ────────────────────────────
-Deno.serve(async (_req) => {
-  const t0 = Date.now();
+Deno.serve(async () => {
+  const startTime = Date.now();
 
   try {
-    const { items, stats } = await aggregateAllFeeds();
-    const rows = items.map(toRow);
+    let allItems: any[] = [];
 
-    // Upsert in batch da 200 — evita request body troppo grandi.
-    let inserted = 0;
-    for (const batch of chunk(rows, 200)) {
-      const { error, count } = await supa
-        .from('news_items')
-        .upsert(batch, { onConflict: 'hash', count: 'exact', ignoreDuplicates: false });
-      if (error) throw error;
-      inserted += count ?? batch.length;
+    for (const feed of FEEDS) {
+      const items = await fetchAndParseFeed(feed);
+      allItems = [...allItems, ...items];
     }
 
-    // Pulizia: elimina news più vecchie di MAX_AGE_DAYS.
-    const threshold = new Date(Date.now() - MAX_AGE_DAYS * 86_400_000).toISOString();
-    const { error: delErr, count: deleted } = await supa
+    // Upsert su Supabase
+    const { error, count } = await supa
       .from('news_items')
-      .delete({ count: 'exact' })
-      .lt('published_at', threshold);
-    if (delErr) console.warn('cleanup failed:', delErr.message);
+      .upsert(allItems, { 
+        onConflict: 'hash',
+        ignoreDuplicates: true 
+      });
 
-    const elapsed = Date.now() - t0;
+    if (error) throw error;
+
+    // Pulizia news vecchie
+    const threshold = new Date(Date.now() - MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    await supa.from('news_items').delete().lt('published_at', threshold);
+
     return new Response(
       JSON.stringify({
-        ok: true,
-        elapsed_ms: elapsed,
-        upserted: inserted,
-        deleted: deleted ?? 0,
-        stats,
+        success: true,
+        total_fetched: allItems.length,
+        upserted: count,
+        execution_time_ms: Date.now() - startTime
       }),
-      { headers: { 'Content-Type': 'application/json' } },
+      { headers: { "Content-Type": "application/json" } }
     );
-  } catch (err) {
-    console.error('[sync-news] fatal:', err);
+
+  } catch (err: any) {
+    console.error("Errore sync-news:", err);
     return new Response(
-      JSON.stringify({ ok: false, error: (err as Error).message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
+      JSON.stringify({ success: false, error: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });
-
-/*
- * Promemoria struttura cartella:
- *   supabase/functions/sync-news/
- *     ├─ index.ts        ← questo file
- *     ├─ _parser.ts      ← copia del parser (porting Deno-friendly)
- *     └─ _config.ts      ← copia del config (idem)
- *
- * Il porting Deno richiede:
- *   - Sostituire `import { XMLParser } from 'fast-xml-parser'`
- *     con `import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.4.1'`
- *   - Mantenere il resto invariato (Web Crypto è disponibile nativamente).
- */
