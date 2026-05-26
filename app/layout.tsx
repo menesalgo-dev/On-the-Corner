@@ -1,6 +1,6 @@
 /**
  * app/layout.tsx — Root layout di On The Corner.
- * Carica i font, imposta i CSS variables, dark mode nativa.
+ * Carica font, header, footer, bottom nav. Tutti i metadata SEO.
  */
 import type { Metadata, Viewport } from 'next';
 import { Archivo_Black, Inter, DM_Mono } from 'next/font/google';
@@ -27,15 +27,26 @@ const dmMono = DM_Mono({
   display: 'swap',
 });
 
+function safeMetadataBase(): URL | undefined {
+  try {
+    const raw = process.env.NEXT_PUBLIC_SITE_URL;
+    if (!raw) return undefined;
+    const url = raw.startsWith('http') ? raw : `https://${raw}`;
+    return new URL(url);
+  } catch {
+    return undefined;
+  }
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
+  metadataBase: safeMetadataBase(),
   title: {
     default: 'On The Corner — Sport, schedine e notizie in tempo reale',
     template: '%s · On The Corner',
   },
   description:
-    'Aggregatore sportivo italiano: notizie aggregate dalle migliori fonti, partite live, schedine in tempo reale, statistiche e gamification.',
-  keywords: ['calcio', 'Serie A', 'Formula 1', 'Tennis', 'schedine', 'notizie sportive', 'live score'],
+    'Notizie sportive da 21 fonti, match live, schedine in tempo reale. Calcio, F1, MotoGP, Tennis, Champions, NFL.',
+  keywords: ['calcio', 'serie a', 'formula 1', 'motogp', 'tennis', 'champions league', 'nfl', 'schedine', 'live score', 'notizie sport'],
   authors: [{ name: 'On The Corner' }],
   openGraph: {
     type: 'website',
@@ -43,17 +54,11 @@ export const metadata: Metadata = {
     siteName: 'On The Corner',
     title: 'On The Corner — Sport, schedine e notizie in tempo reale',
     description: 'Aggregatore sportivo italiano premium.',
-    images: ['/og-image.png'],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'On The Corner',
     description: 'Sport, schedine e notizie in tempo reale.',
-  },
-  manifest: '/manifest.webmanifest',
-  icons: {
-    icon: '/favicon.ico',
-    apple: '/icons/apple-touch-icon.png',
   },
 };
 
