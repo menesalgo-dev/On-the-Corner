@@ -90,9 +90,10 @@ function HeroVariant({ news, isBookmarked }: Props) {
         </div>
       </Link>
       <div className="absolute right-4 top-4 z-10">
-        <BookmarkButton newsId={news.id} initialBookmarked={isBookmarked} variant="floating" />
-      </div>
-    </article>
+       <BookmarkButton
+  newsId={news.id}
+  initialBookmarked={isBookmarked ?? false}
+  variant="floating"
   );
 }
 
