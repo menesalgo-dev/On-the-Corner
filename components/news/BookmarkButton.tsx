@@ -1,6 +1,6 @@
 /**
  * components/news/BookmarkButton.tsx
- * Bookmark con optimistic UI + toast. Funziona solo se loggato.
+ * Bottone bookmark con optimistic UI + toast.
  */
 'use client';
 
@@ -9,7 +9,6 @@ import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { toggleBookmark } from '@/server/actions/bookmarks';
-import { cn } from '@/lib/utils';
 
 interface Props {
   newsId: string;
@@ -26,48 +25,51 @@ export function BookmarkButton({ newsId, initialBookmarked, variant = 'inline' }
     e.preventDefault();
     e.stopPropagation();
 
-    // Optimistic flip
     const next = !bookmarked;
     setBookmarked(next);
 
     startTransition(async () => {
       const result = await toggleBookmark(newsId);
-
       if (!result.ok) {
-        // Rollback
         setBookmarked(!next);
         if (result.error === 'not_authenticated') {
-          toast.error('Devi accedere per salvare le notizie.', {
-            action: { label: 'Accedi', onClick: () => router.push('/login') },
+          toast.error('Accedi per salvare le notizie.', {
+            action: { label: 'Login', onClick: () => router.push('/login') },
           });
         } else {
-          toast.error('Errore nel salvataggio.');
+          toast.error('Errore.');
         }
         return;
       }
-
-      toast.success(next ? 'Notizia salvata' : 'Notizia rimossa', { duration: 1500 });
+      toast.success(next ? 'Salvata' : 'Rimossa', { duration: 1200 });
     });
   }
 
   const Icon = bookmarked ? BookmarkCheck : Bookmark;
 
+  if (variant === 'floating') {
+    return (
+      <button
+        onClick={handleClick}
+        disabled={isPending}
+        aria-label={bookmarked ? 'Rimuovi' : 'Salva'}
+        className={`rounded-full bg-black/70 p-2 backdrop-blur transition disabled:opacity-50 ${
+          bookmarked ? 'text-[#e8c800]' : 'text-white hover:bg-[#e8c800] hover:text-black'
+        }`}
+      >
+        <Icon className="h-4 w-4" strokeWidth={bookmarked ? 2.5 : 2} />
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={handleClick}
       disabled={isPending}
-      aria-label={bookmarked ? 'Rimuovi dai preferiti' : 'Salva'}
-      className={cn(
-        'transition disabled:opacity-50',
-        variant === 'floating'
-          ? 'rounded-full bg-otc-bg/70 p-2 backdrop-blur hover:bg-otc-accent hover:text-black'
-          : 'rounded-md p-1.5 hover:bg-otc-surface-2',
-        bookmarked
-          ? 'text-otc-accent'
-          : variant === 'floating'
-            ? 'text-white'
-            : 'text-otc-text-3 hover:text-otc-accent',
-      )}
+      aria-label={bookmarked ? 'Rimuovi' : 'Salva'}
+      className={`rounded-md p-1.5 transition disabled:opacity-50 ${
+        bookmarked ? 'text-[#e8c800]' : 'text-zinc-500 hover:bg-[#141414] hover:text-[#e8c800]'
+      }`}
     >
       <Icon className="h-4 w-4" strokeWidth={bookmarked ? 2.5 : 2} />
     </button>
