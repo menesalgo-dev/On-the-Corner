@@ -1,84 +1,116 @@
 /**
- * app/news/page.tsx — Feed completo notizie con filtro per fonte.
- * URL: /news?source=g (filtra per Gazzetta), /news?source=all (default)
+ * app/news/page.tsx
+ * Feed completo news con filtri categoria + fonte.
  */
 import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { NewsCard } from '@/components/news/NewsCard';
-import { fetchNewsPage, fetchUserBookmarkIds, fetchNewsStats } from '@/lib/news';
-import { cn } from '@/lib/utils';
+import { CategoryTabs } from '@/components/news/CategoryTabs';
+import { EmptyState } from '@/components/shared/EmptyState';
+import {
+  fetchNewsPage,
+  fetchUserBookmarkIds,
+  fetchNewsStats,
+  fetchCategoryCounts,
+  fetchCategories,
+} from '@/lib/news';
 
-export const revalidate = 300;
+export const revalidate = 120;
+
+export const metadata = {
+  title: 'Tutte le notizie sportive',
+  description: 'Notizie aggregate da 21 fonti italiane e internazionali.',
+};
 
 interface PageProps {
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<{ source?: string; category?: string }>;
 }
 
 export default async function NewsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const activeSource = params.source && params.source !== 'all' ? params.source : undefined;
+  const activeCategory = params.category && params.category !== 'all' ? params.category : undefined;
 
-  const [news, bookmarks, stats] = await Promise.all([
-    fetchNewsPage({ limit: 40, sourceId: activeSource }),
+  const [news, bookmarks, stats, counts, cats] = await Promise.all([
+    fetchNewsPage({ limit: 60, sourceId: activeSource, categoryId: activeCategory }),
     fetchUserBookmarkIds(),
     fetchNewsStats(),
+    fetchCategoryCounts(),
+    fetchCategories(),
   ]);
+
+  const tabs = cats.map((c) => ({
+    id: c.id,
+    name: c.short_name ?? c.name,
+    emoji: c.emoji ?? undefined,
+    count: counts.get(c.id) ?? 0,
+  }));
 
   return (
     <>
       <Header />
 
       <main className="mx-auto max-w-[1320px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12">
-        <div className="mb-6 flex items-baseline justify-between">
-          <h1 className="font-display text-2xl uppercase tracking-tight sm:text-4xl">
-            Notizie<span className="text-otc-accent">.</span>
+        <header className="mb-4 flex items-baseline justify-between">
+          <h1
+            className="text-2xl uppercase tracking-tight sm:text-4xl"
+            style={{ fontFamily: 'var(--font-archivo-black)' }}
+          >
+            Notizie<span className="text-[#e8c800]">.</span>
           </h1>
-          <span className="font-mono text-xs uppercase tracking-widest text-otc-text-3">
+          <span
+            className="text-xs uppercase tracking-widest text-zinc-500"
+            style={{ fontFamily: 'var(--font-dm-mono)' }}
+          >
             {news.length} risultati
           </span>
-        </div>
+        </header>
 
-        {/* Filtri fonti (scroll orizzontale su mobile) */}
-        <nav
-          className="mb-6 -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0"
-          style={{ scrollbarWidth: 'none' }}
-        >
-          <FilterChip href="/news" label="Tutte" active={!activeSource} />
-          {stats.sources.slice(0, 15).map((s) => (
-            <FilterChip
-              key={s.id}
-              href={`/news?source=${s.id}`}
-              label={s.name}
-              count={s.count}
-              active={activeSource === s.id}
-            />
-          ))}
+        <CategoryTabs tabs={tabs} activeId={activeCategory} basePath="/news" />
+
+        {/* Filtro fonti */}
+        <nav className="mb-6 flex gap-2 overflow-x-auto scrollbar-hide">
+          <FilterChip
+            href={`/news${activeCategory ? `?category=${activeCategory}` : ''}`}
+            label="Tutte fonti"
+            active={!activeSource}
+          />
+          {stats.sources.slice(0, 15).map((s) => {
+            const sp = new URLSearchParams();
+            if (activeCategory) sp.set('category', activeCategory);
+            sp.set('source', s.id);
+            return (
+              <FilterChip
+                key={s.id}
+                href={`/news?${sp.toString()}`}
+                label={s.name}
+                count={s.count}
+                active={activeSource === s.id}
+              />
+            );
+          })}
         </nav>
 
         {news.length === 0 ? (
-          <div className="rounded-2xl border border-otc-line bg-otc-surface p-10 text-center">
-            <p className="text-otc-text-2">Nessuna notizia trovata per questa fonte.</p>
-            <Link
-              href="/news"
-              className="mt-4 inline-block font-mono text-xs uppercase tracking-widest text-otc-accent hover:underline"
-            >
-              ← Mostra tutte
-            </Link>
-          </div>
+          <EmptyState
+            emoji="🔍"
+            title="Nessuna notizia"
+            description="Nessun risultato per i filtri attivi."
+            actionLabel="Reset filtri"
+            actionHref="/news"
+          />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {news.map((item) => (
-              <NewsCard
-                key={item.id}
-                news={item}
-                isBookmarked={bookmarks.has(item.id)}
-              />
+              <NewsCard key={item.id} news={item} isBookmarked={bookmarks.has(item.id)} />
             ))}
           </div>
         )}
       </main>
 
+      <Footer />
       <BottomNav />
     </>
   );
@@ -90,16 +122,17 @@ function FilterChip({
   return (
     <Link
       href={href}
-      className={cn(
-        'shrink-0 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition',
+      className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
         active
-          ? 'border-otc-accent bg-otc-accent text-black'
-          : 'border-otc-line bg-otc-surface text-otc-text-2 hover:border-otc-accent/40 hover:text-otc-accent',
-      )}
+          ? 'border-[#e8c800] bg-[#e8c800] text-black'
+          : 'border-[#1f1f1f] bg-[#0d0d0d] text-zinc-400 hover:border-[#e8c800]/40 hover:text-[#e8c800]'
+      }`}
     >
       {label}
       {count !== undefined && !active && (
-        <span className="ml-1.5 font-mono text-[10px] text-otc-text-3">{count}</span>
+        <span className="ml-1.5 text-[10px] text-zinc-600" style={{ fontFamily: 'var(--font-dm-mono)' }}>
+          {count}
+        </span>
       )}
     </Link>
   );
