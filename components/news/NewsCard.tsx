@@ -27,13 +27,18 @@ interface Props {
   variant?: 'hero' | 'default' | 'compact';
 }
 
+interface InternalProps {
+  news: NewsCardData;
+  isBookmarked: boolean;
+}
+
 export function NewsCard({ news, isBookmarked = false, variant = 'default' }: Props) {
   if (variant === 'hero') return <HeroVariant news={news} isBookmarked={isBookmarked} />;
   if (variant === 'compact') return <CompactVariant news={news} isBookmarked={isBookmarked} />;
   return <DefaultVariant news={news} isBookmarked={isBookmarked} />;
 }
 
-function HeroVariant({ news, isBookmarked }: Props) {
+function HeroVariant({ news, isBookmarked }: InternalProps) {
   return (
     <article className="group relative overflow-hidden rounded-3xl border border-[#1f1f1f] bg-[#0d0d0d] transition hover:border-[#e8c800]/40">
       <Link
@@ -96,7 +101,7 @@ function HeroVariant({ news, isBookmarked }: Props) {
   );
 }
 
-function DefaultVariant({ news, isBookmarked }: Props) {
+function DefaultVariant({ news, isBookmarked }: InternalProps) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] transition hover:-translate-y-1 hover:border-[#e8c800]/40 hover:shadow-[0_14px_40px_-20px_rgba(232,200,0,0.35)]">
       <Link
@@ -157,7 +162,7 @@ function DefaultVariant({ news, isBookmarked }: Props) {
   );
 }
 
-function CompactVariant({ news, isBookmarked }: Props) {
+function CompactVariant({ news }: InternalProps) {
   return (
     <article className="group flex gap-3 rounded-xl border border-[#1f1f1f] bg-[#0d0d0d] p-2.5 transition hover:border-[#e8c800]/40">
       <Link
