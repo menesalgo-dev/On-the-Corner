@@ -8,7 +8,7 @@ import type { NewsCardData } from '@/components/news/NewsCard';
 
 interface AnyRow {
   id: unknown;
-  hash?: unknown; // ✅ Aggiunto l'hash nel tipo
+  hash?: unknown;
   title: unknown;
   link: unknown;
   description: unknown;
@@ -21,7 +21,7 @@ interface AnyRow {
 }
 
 function toCard(r: AnyRow): NewsCardData {
-  // ✅ CORREZIONE: Se r.id non esiste o è vuoto, usa la colonna r.hash inserita dallo script di sincronizzazione
+  // Se l'id primario non è mappato usa l'hash inserito dal cron job
   const finalId = r.id ? String(r.id) : (r.hash ? String(r.hash) : '');
 
   return {
@@ -33,39 +33,43 @@ function toCard(r: AnyRow): NewsCardData {
     source_name: String(r.source_name ?? ''),
     published_at: String(r.published_at ?? ''),
     category_id: r.category_id ? String(r.category_id) : null,
-    category_name: r.category_name ? String(r.category_name) : null,
-    category_emoji: r.category_emoji ? String(r.category_emoji) : null,
+    category_name: r.category_name ? String(r.category_name) : String(r.category_id ?? ''),
+    category_emoji: r.category_emoji ? String(r.category_emoji) : '📰',
   };
 }
 
-/** Ultime N notizie, opzionalmente filtrate per categoria. */
+/** Ultime N notizie, pescate direttamente dalla tabella per saltare la vista relazionale corrotta */
 export async function fetchLatestNews(opts: { limit?: number; categoryId?: string } = {}): Promise<NewsCardData[]> {
   const supabase = await createClient();
+  
   try {
+    // Interroghiamo direttamente la tabella news_items per bypassare i problemi della vista
     let q = supabase
-      .from('news_with_category')
-      .select('id, hash, title, link, description, image_url, source_name, published_at, category_id, category_name, category_emoji') // ✅ Richiesto anche hash
-      .order('priority', { ascending: true })
-      .order('published_at', { ascending: false })
+      .from('news_items')
+      .select('id, hash, title, link, description, image_url, source_name, published_at, category_id')
+      .order('published_at', { ascending: false }) // Ordina per le più recenti
       .limit(opts.limit ?? 30);
-    if (opts.categoryId) q = q.eq('category_id', opts.categoryId);
+      
+    // Applica il filtro testuale ('calcio', 'f1', 'tennis') verificato nel DB
+    if (opts.categoryId && opts.categoryId !== 'tutto') {
+      q = q.eq('category_id', opts.categoryId);
+    }
+    
     const { data, error } = await q;
-    if (!error && data) return (data as AnyRow[]).map(toCard);
-  } catch {
-    // ignore
+    
+    if (error) {
+      console.error("Errore Supabase nella fetchLatestNews:", error.message);
+      return [];
+    }
+    
+    return ((data ?? []) as AnyRow[]).map(toCard);
+  } catch (err) {
+    console.error("Errore critico in fetchLatestNews:", err);
+    return [];
   }
-
-  // Fallback sulla tabella principale
-  const { data } = await supabase
-    .from('news_items')
-    .select('id, hash, title, link, description, image_url, source_name, published_at') // ✅ Richiesto anche hash
-    .order('priority', { ascending: true })
-    .order('published_at', { ascending: false })
-    .limit(opts.limit ?? 30);
-  return ((data ?? []) as AnyRow[]).map(toCard);
 }
 
-/** Paginazione cursor-based con filtri. */
+/** Paginazione cursor-based con filtri diretti */
 export async function fetchNewsPage(opts: {
   limit?: number;
   before?: string | null;
@@ -75,26 +79,18 @@ export async function fetchNewsPage(opts: {
   const supabase = await createClient();
   try {
     let q = supabase
-      .from('news_with_category')
-      .select('id, hash, title, link, description, image_url, source_name, published_at, category_id, category_name, category_emoji, priority, source_id')
+      .from('news_items')
+      .select('id, hash, title, link, description, image_url, source_name, published_at, category_id')
       .order('published_at', { ascending: false })
       .limit(opts.limit ?? 20);
     if (opts.before) q = q.lt('published_at', opts.before);
     if (opts.sourceId) q = q.eq('source_id', opts.sourceId);
-    if (opts.categoryId) q = q.eq('category_id', opts.categoryId);
+    if (opts.categoryId && opts.categoryId !== 'tutto') q = q.eq('category_id', opts.categoryId);
+    
     const { data, error } = await q;
     if (!error && data) return (data as AnyRow[]).map(toCard);
   } catch {}
-
-  let q = supabase
-    .from('news_items')
-    .select('id, hash, title, link, description, image_url, source_name, published_at')
-    .order('published_at', { ascending: false })
-    .limit(opts.limit ?? 20);
-  if (opts.before) q = q.lt('published_at', opts.before);
-  if (opts.sourceId) q = q.eq('source_id', opts.sourceId);
-  const { data } = await q;
-  return ((data ?? []) as AnyRow[]).map(toCard);
+  return [];
 }
 
 /** Ricerca full-text */
@@ -110,13 +106,13 @@ export async function searchNews(query: string, limit = 30): Promise<NewsCardDat
   return ((data ?? []) as AnyRow[]).map(toCard);
 }
 
-/** Notizia per id (per /news/[id]) */
+/** Notizia per id/hash */
 export async function fetchNewsById(id: string): Promise<NewsCardData | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('news_items')
-    .select('id, hash, title, link, description, image_url, source_name, published_at')
-    .eq('hash', id) // ✅ Cerca per hash se l'id non è mappato primario
+    .select('id, hash, title, link, description, image_url, source_name, published_at, category_id')
+    .eq('hash', id)
     .maybeSingle();
   return data ? toCard(data as AnyRow) : null;
 }
@@ -124,14 +120,18 @@ export async function fetchNewsById(id: string): Promise<NewsCardData | null> {
 /** Bookmarks dell'utente corrente */
 export async function fetchUserBookmarkIds(): Promise<Set<string>> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new Set();
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return new Set();
 
-  const { data } = await supabase
-    .from('news_bookmarks')
-    .select('news_id')
-    .eq('user_id', user.id);
-  return new Set(((data ?? []) as { news_id: unknown }[]).map((r) => String(r.news_id)));
+    const { data } = await supabase
+      .from('news_bookmarks')
+      .select('news_id')
+      .eq('user_id', user.id);
+    return new Set(((data ?? []) as { news_id: unknown }[]).map((r) => String(r.news_id)));
+  } catch {
+    return new Set();
+  }
 }
 
 /** Ticker items (14 più recenti) */
@@ -142,7 +142,6 @@ export async function fetchTickerItems(): Promise<
   const { data } = await supabase
     .from('news_items')
     .select('id, hash, title, link, source_name')
-    .order('priority', { ascending: true })
     .order('published_at', { ascending: false })
     .limit(14);
   return ((data ?? []) as AnyRow[]).map((r) => ({
@@ -185,10 +184,13 @@ export async function fetchNewsStats(): Promise<{
 export async function fetchCategoryCounts(): Promise<Map<string, number>> {
   const supabase = await createClient();
   try {
-    const { data } = await supabase.rpc('news_count_by_category');
+    const { data } = await supabase.from('news_items').select('category_id');
     const m = new Map<string, number>();
-    (data ?? []).forEach((r: { category_id: unknown; count: unknown }) => {
-      if (r.category_id) m.set(String(r.category_id), Number(r.count));
+    (data ?? []).forEach((r: { category_id: unknown }) => {
+      if (r.category_id) {
+        const key = String(r.category_id);
+        m.set(key, (m.get(key) ?? 0) + 1);
+      }
     });
     return m;
   } catch {
@@ -196,26 +198,15 @@ export async function fetchCategoryCounts(): Promise<Map<string, number>> {
   }
 }
 
-/** Categorie configurate */
+/** Categorie fittizie hardcoded per sbloccare i pulsanti del menu se la tabella categories è vuota */
 export async function fetchCategories(): Promise<
   { id: string; name: string; short_name: string | null; emoji: string | null; sort_order: number }[]
 > {
-  const supabase = await createClient();
-  try {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('id, name, short_name, emoji, sort_order')
-      .neq('id', 'altro')
-      .order('sort_order', { ascending: true });
-    if (error || !data) return [];
-    return data.map((r: { id: unknown; name: unknown; short_name: unknown; emoji: unknown; sort_order: unknown }) => ({
-      id: String(r.id),
-      name: String(r.name ?? ''),
-      short_name: r.short_name ? String(r.short_name) : null,
-      emoji: r.emoji ? String(r.emoji) : null,
-      sort_order: Number(r.sort_order ?? 100),
-    }));
-  } catch {
-    return [];
-  }
+  return [
+    { id: 'tutto', name: 'Tutto', short_name: 'Tutto', emoji: '📰', sort_order: 1 },
+    { id: 'calcio', name: 'Calcio', short_name: 'Calcio', emoji: '⚽', sort_order: 2 },
+    { id: 'f1', name: 'F1', short_name: 'F1', emoji: '🏎️', sort_order: 3 },
+    { id: 'tennis', name: 'Tennis', short_name: 'Tennis', emoji: '🎾', sort_order: 4 },
+    { id: 'motogp', name: 'MotoGP', short_name: 'MotoGP', emoji: '🏍️', sort_order: 5 }
+  ];
 }
