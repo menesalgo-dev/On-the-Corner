@@ -1,7 +1,7 @@
 /**
  * lib/news/types.ts
  * Tipi condivisi tra RSS parser e integratori API esterne.
- * Aggiornato con helper di mappatura nativi per PostgreSQL (Supabase).
+ * Aggiornato con helper di mappatura nativi per PostgreSQL (Supabase) ed estensione interfaccia.
  */
 import type { CategoryId } from '@/lib/rss/config';
 
@@ -18,6 +18,20 @@ export interface NewsItem {
   publishedAt: string;
   tags: string[];
   categoryId: CategoryId;
+}
+
+/**
+ * Estensione per garantire la massima retrocompatibilità tra componenti UI originali e nuovi moduli.
+ * Previene i crash di tipo "missing properties" lasciando inalterati controlli e layout grafici.
+ */
+export interface NewsCardData extends NewsItem {
+  id?: string;
+  image_url?: string | null;
+  source_name?: string;
+  published_at?: string;
+  category_id?: string | number;
+  category_name?: string;
+  category_emoji?: string;
 }
 
 const STRIP_TAGS = /<[^>]+>/g;
