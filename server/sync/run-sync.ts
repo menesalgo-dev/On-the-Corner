@@ -7,7 +7,9 @@
  *  4. Upsert su Supabase con onConflict
  *  5. Cleanup notizie vecchie
  */
-import { createClient } from '@supabase/supabase-js';
+// ❌ Sostituito createClient generico
+// ✅ Importato il service client centralizzato che già gestisce le opzioni in modo corretto
+import { createServiceClient } from '@/lib/supabase/service'; 
 import { fetchAllRssNews } from '@/lib/rss/parser';
 import { fetchNewsApi } from '@/lib/external-news/newsapi';
 import { fetchGuardian } from '@/lib/external-news/guardian';
@@ -152,9 +154,8 @@ export async function runSync(): Promise<SyncResult> {
     };
   }
 
-  const supabase = createClient(supaUrl, serviceRole, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  // ✅ Inizializzazione pulita usando il file service.ts che abbiamo controllato prima
+  const supabase = createServiceClient();
 
   // 1. Fetch parallelo da TUTTE le fonti
   const [rssResult, newsapi, guardian, gnews] = await Promise.all([
@@ -227,7 +228,8 @@ export async function runSync(): Promise<SyncResult> {
         error: `upsert: ${error.message}`,
       };
     }
-    upserted += count ?? batch.length;
+    // Assicurati che se count è null prenda la lunghezza del batch per la statistica
+    upserted += count ?? batch.length; 
   }
 
   // 7. Cleanup notizie troppo vecchie
