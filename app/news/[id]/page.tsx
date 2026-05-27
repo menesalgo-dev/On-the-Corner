@@ -64,14 +64,14 @@ export default async function NewsDetailPage({ params }: PageProps) {
     .filter((n) => n.hash !== news.hash)
     .slice(0, 5);
 
-  // Mappatura statica delle icone/nomi sport per sopperire alla rimozione della vista
-  const categoryMeta: Record<number, { name: string; emoji: string }> = {
-    1: { name: 'Calcio', emoji: '⚽' },
-    2: { name: 'F1', emoji: '🏎️' },
-    3: { name: 'Tennis', emoji: '🎾' },
-    4: { name: 'MotoGP', emoji: '🏍️' }
+  // Mappatura statica con chiavi stringa per allinearsi a NewsItem in Strict Mode
+  const categoryMeta: Record<string, { name: string; emoji: string }> = {
+    '1': { name: 'Calcio', emoji: '⚽' },
+    '2': { name: 'F1', emoji: '🏎️' },
+    '3': { name: 'Tennis', emoji: '🎾' },
+    '4': { name: 'MotoGP', emoji: '🏍️' }
   };
-  const currentCategory = categoryMeta[news.categoryId as number];
+  const currentCategory = categoryMeta[String(news.categoryId)];
 
   return (
     <>
@@ -178,7 +178,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
               {otherNews.map((n) => (
                 <NewsCard 
                   key={n.hash} 
-                  news={n} 
+                  news={n as any} 
                   isBookmarked={bookmarkHashes.has(n.hash)} 
                   variant="compact" 
                 />
