@@ -13,8 +13,9 @@ import { MobileMenu } from './MobileMenu';
 const NAV_LINKS = [
   { href: '/news', label: 'Notizie' },
   { href: '/live', label: 'Live' },
+   { href: '/schedine', label: 'Schedine' },
   { href: '/fantacalcio', label: 'Fantacalcio' },
-  { href: '/bookmarks', label: 'Archivio' }, 
+  { href: '/bookmarks', label: 'Archivio' },
 ];
 
 export async function Header() {
