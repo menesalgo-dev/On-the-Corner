@@ -107,7 +107,7 @@ export function similarity(a: string, b: string): number {
 
 /**
  * Converte i record grezzi estratti in snake_case dal database Supabase
- * nell'oggetto tipizzato NewsCardData atteso nativamente dai tuoi componenti UI.
+ * nell'oggetto tipizzato NewsCardData applicando la sanificazione dei protocolli multimediali.
  */
 export function toNewsCardData(row: any): NewsCardData {
   const categoryMeta: Record<string, { name: string; emoji: string }> = {
@@ -119,13 +119,19 @@ export function toNewsCardData(row: any): NewsCardData {
 
   const meta = categoryMeta[String(row.category_id || '')];
 
+  // FIX KILLER IMMAGINI: Forza il protocollo HTTPS sicuro per evitare blocchi Mixed Content di Next.js
+  let cleanImageUrl = row.image_url || row.imageUrl || null;
+  if (cleanImageUrl && cleanImageUrl.startsWith('http://')) {
+    cleanImageUrl = cleanImageUrl.replace('http://', 'https://');
+  }
+
   return {
-    id: row.hash, // L'hash sostituisce l'id numerico per uniformità logica
+    id: row.hash,
     title: row.title || '',
     link: row.link || row.url || '',
-    description: row.description || row.summary || null,
-    image_url: row.image_url,
-    source_name: row.source_name || row.source || 'Inconnu',
+    description: row.description || row.summary || null, // Intercetta entrambi i campi del cron
+    image_url: cleanImageUrl,
+    source_name: row.source_name || row.source || 'Premium Source',
     published_at: row.published_at,
     category_id: row.category_id ? String(row.category_id) : null,
     category_name: meta ? meta.name : null,
