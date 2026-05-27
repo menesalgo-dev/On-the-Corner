@@ -1,139 +1,108 @@
 /**
  * app/news/page.tsx
- * Feed completo news con filtri categoria + fonte.
+ * Feed completo delle notizie con Sidebar e filtri per fonte e categoria.
+ * Interamente allineato alle funzioni stabili basate sull'hash logico.
  */
-import Link from 'next/link';
-import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer';
-import { BottomNav } from '@/components/layout/BottomNav';
+import React from 'react';
+import { getNewsItems, fetchUserBookmarkHashes } from '@/lib/news';
+import { toFrontendItem } from '@/lib/news/types';
 import { NewsCard } from '@/components/news/NewsCard';
-import { CategoryTabs } from '@/components/news/CategoryTabs';
-import { EmptyState } from '@/components/shared/EmptyState';
-import {
-  fetchNewsPage,
-  fetchUserBookmarkIds,
-  fetchNewsStats,
-  fetchCategoryCounts,
-  fetchCategories,
-} from '@/lib/news';
+import SideNav from '@/components/layout/SideNav';
+import EmptyState from '@/components/shared/EmptyState';
 
-export const revalidate = 120;
-
-export const metadata = {
-  title: 'Tutte le notizie sportive',
-  description: 'Notizie aggregate da 21 fonti italiane e internazionali.',
-};
+// Forza la rigenerazione dinamica in tempo reale a ogni visita eliminando il vuoto statico
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface PageProps {
-  searchParams: Promise<{ source?: string; category?: string }>;
+  searchParams: Promise<{
+    category?: string;
+    source?: string;
+    page?: string;
+  }>;
 }
 
 export default async function NewsPage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const activeSource = params.source && params.source !== 'all' ? params.source : undefined;
-  const activeCategory = params.category && params.category !== 'all' ? params.category : undefined;
+  // Risoluzione asincrona dei parametri di ricerca come richiesto da Next.js 15
+  const resolvedParams = await searchParams;
+  const currentCategory = resolvedParams.category || 'tutto';
+  const currentSource = resolvedParams.source || 'tutte fonti';
+  const currentPage = Number(resolvedParams.page) || 1;
+  const itemsPerPage = 24;
 
-  const [news, bookmarks, stats, counts, cats] = await Promise.all([
-    fetchNewsPage({ limit: 60, sourceId: activeSource, categoryId: activeCategory }),
-    fetchUserBookmarkIds(),
-    fetchNewsStats(),
-    fetchCategoryCounts(),
-    fetchCategories(),
+  // Recupero parallelo delle notizie filtrate e del set di hash salvati nei preferiti
+  const [newsData, bookmarkHashes] = await Promise.all([
+    getNewsItems({
+      category: currentCategory,
+      source: currentSource,
+      page: currentPage,
+      limit: itemsPerPage
+    }),
+    fetchUserBookmarkHashes()
   ]);
 
-  const tabs = cats.map((c) => ({
-    id: c.id,
-    name: c.short_name ?? c.name,
-    emoji: c.emoji ?? undefined,
-    count: counts.get(c.id) ?? 0,
-  }));
+  const { news: rawNews, count: totalCount } = newsData;
+
+  // Conversione pulita dei record PostgreSQL in oggetti NewsCardData (CamelCase)
+  const formattedNews = (rawNews || []).map((row: any) => {
+    const item = toFrontendItem(row);
+    return {
+      ...item,
+      id: item.hash, // Forziamo l'id per mantenere la stabilità dei componenti UI ereditati
+      image_url: item.imageUrl,
+      source_name: item.sourceName,
+      published_at: item.publishedAt,
+      category_id: item.categoryId
+    };
+  });
 
   return (
-    <>
-      <Header />
+    <div className="flex min-h-screen bg-[#080808] text-white">
+      {/* Sidebar di navigazione strutturata originale */}
+      <SideNav activeCategory={currentCategory} activeSource={currentSource} />
 
-      <main className="mx-auto max-w-[1320px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12">
-        <header className="mb-4 flex items-baseline justify-between">
-          <h1
-            className="text-2xl uppercase tracking-tight sm:text-4xl"
-            style={{ fontFamily: 'var(--font-archivo-black)' }}
-          >
-            Notizie<span className="text-[#e8c800]">.</span>
-          </h1>
-          <span
-            className="text-xs uppercase tracking-widest text-zinc-500"
+      <main className="flex-1 p-6 md:p-10">
+        {/* Header Sezione con Titolo e Contatore Dinamico */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 border-b border-zinc-800 pb-4">
+          <div>
+            <h1 
+              className="text-3xl font-black uppercase tracking-tight text-[#e8c800]"
+              style={{ fontFamily: 'var(--font-archivo-black)' }}
+            >
+              Notizie
+            </h1>
+            <p className="text-sm text-zinc-400 mt-1">
+              Feed aggregato da 21 fonti premium con dedup intelligente.
+            </p>
+          </div>
+          <div 
+            className="text-xs font-mono tracking-widest text-zinc-500 uppercase mt-2 md:mt-0"
             style={{ fontFamily: 'var(--font-dm-mono)' }}
           >
-            {news.length} risultati
-          </span>
-        </header>
+            {totalCount} {totalCount === 1 ? 'Risultato' : 'Risultati'}
+          </div>
+        </div>
 
-        <CategoryTabs tabs={tabs} activeId={activeCategory} basePath="/news" />
-
-        {/* Filtro fonti */}
-        <nav className="mb-6 flex gap-2 overflow-x-auto scrollbar-hide">
-          <FilterChip
-            href={`/news${activeCategory ? `?category=${activeCategory}` : ''}`}
-            label="Tutte fonti"
-            active={!activeSource}
-          />
-          {stats.sources.slice(0, 15).map((s) => {
-            const sp = new URLSearchParams();
-            if (activeCategory) sp.set('category', activeCategory);
-            sp.set('source', s.id);
-            return (
-              <FilterChip
-                key={s.id}
-                href={`/news?${sp.toString()}`}
-                label={s.name}
-                count={s.count}
-                active={activeSource === s.id}
-              />
-            );
-          })}
-        </nav>
-
-        {news.length === 0 ? (
-          <EmptyState
-            emoji="🔍"
-            title="Nessuna notizia"
-            description="Nessun risultato per i filtri attivi."
-            actionLabel="Reset filtri"
-            actionHref="/news"
-          />
+        {/* Griglia Notizie o Empty State Originario */}
+        {formattedNews.length === 0 ? (
+          <div className="mt-12 flex justify-center">
+            <EmptyState 
+              title="Nessuna Notizia" 
+              description="Nessun risultato trovato nel database per i filtri selezionati."
+            />
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {news.map((item) => (
-              <NewsCard key={item.id} news={item} isBookmarked={bookmarks.has(item.id)} />
+            {formattedNews.map((item) => (
+              <NewsCard 
+                key={item.hash} 
+                news={item as any} 
+                isBookmarked={bookmarkHashes.has(item.hash)} 
+              />
             ))}
           </div>
         )}
       </main>
-
-      <Footer />
-      <BottomNav />
-    </>
-  );
-}
-
-function FilterChip({
-  href, label, count, active,
-}: { href: string; label: string; count?: number; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
-        active
-          ? 'border-[#e8c800] bg-[#e8c800] text-black'
-          : 'border-[#1f1f1f] bg-[#0d0d0d] text-zinc-400 hover:border-[#e8c800]/40 hover:text-[#e8c800]'
-      }`}
-    >
-      {label}
-      {count !== undefined && !active && (
-        <span className="ml-1.5 text-[10px] text-zinc-600" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-          {count}
-        </span>
-      )}
-    </Link>
+    </div>
   );
 }
