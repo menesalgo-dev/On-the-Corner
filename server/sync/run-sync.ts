@@ -46,7 +46,6 @@ export interface SyncResult {
  * Mantiene la prima occorrenza (priority 1 = IT viene PRIMA di priority 2 = EN).
  */
 function deduplicate(items: NewsItem[]): NewsItem[] {
-  // Sort: prima priority 1 (IT), poi per recency
   const sorted = [...items].sort((a, b) =>
     a.priority - b.priority ||
     Date.parse(b.publishedAt) - Date.parse(a.publishedAt),
@@ -58,17 +57,12 @@ function deduplicate(items: NewsItem[]): NewsItem[] {
   const titleIndex: { norm: string }[] = [];
 
   for (const item of sorted) {
-    // L1: hash identico → skip
     if (seenHashes.has(item.hash)) continue;
-    // L2: link canonico identico → skip
     if (seenLinks.has(item.link)) continue;
 
     const norm = normalizeTitle(item.title);
-
-    // L3: titolo normalizzato identico → skip
     let duplicate = titleIndex.some((e) => e.norm === norm);
 
-    // L4: similarity Levenshtein >= soglia → skip
     if (!duplicate) {
       for (const existing of titleIndex) {
         if (Math.abs(existing.norm.length - norm.length) > 25) continue;
@@ -134,12 +128,8 @@ function toRow(n: NewsItem): NewsRow {
 export async function runSync(): Promise<SyncResult> {
   const t0 = Date.now();
 
-export async function runSync(): Promise<SyncResult> {
-  const t0 = Date.now();
-
   let supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
   if (!supaUrl || !serviceRole) {
     return {
       ok: false,
@@ -156,17 +146,13 @@ export async function runSync(): Promise<SyncResult> {
     };
   }
 
-  // 🚨 PULIZIA AUTOMATICA DELL'URL (Risolve spazi e slash finali nascosti)
-  supaUrl = supaUrl.trim(); // Rimuove eventuali spazi vuoti all'inizio o alla fine
+  // Pulizia automatica dell'URL
+  supaUrl = supaUrl.trim();
   if (supaUrl.endsWith('/')) {
-    supaUrl = supaUrl.slice(0, -1); // Rimuove lo slash finale se presente
+    supaUrl = supaUrl.slice(0, -1);
   }
 
-  // Inizializzazione con l'URL perfettamente pulito
   const supabase = createClient(supaUrl, serviceRole);
-
-  // ... (tutto il resto del tuo codice di fetch, dedup, ecc. rimane identico) ...
-
 
   // 1. Fetch parallelo da TUTTE le fonti
   const [rssResult, newsapi, guardian, gnews] = await Promise.all([
