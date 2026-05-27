@@ -8,6 +8,7 @@ import type { NewsCardData } from '@/components/news/NewsCard';
 
 interface AnyRow {
   id: unknown;
+  hash?: unknown; // ✅ Aggiunto l'hash nel tipo
   title: unknown;
   link: unknown;
   description: unknown;
@@ -20,8 +21,11 @@ interface AnyRow {
 }
 
 function toCard(r: AnyRow): NewsCardData {
+  // ✅ CORREZIONE: Se r.id non esiste o è vuoto, usa la colonna r.hash inserita dallo script di sincronizzazione
+  const finalId = r.id ? String(r.id) : (r.hash ? String(r.hash) : '');
+
   return {
-    id: String(r.id),
+    id: finalId,
     title: String(r.title ?? ''),
     link: String(r.link ?? ''),
     description: r.description ? String(r.description) : null,
@@ -37,11 +41,10 @@ function toCard(r: AnyRow): NewsCardData {
 /** Ultime N notizie, opzionalmente filtrate per categoria. */
 export async function fetchLatestNews(opts: { limit?: number; categoryId?: string } = {}): Promise<NewsCardData[]> {
   const supabase = await createClient();
-  // Provo prima news_with_category, fallback su news_items se la vista non esiste
   try {
     let q = supabase
       .from('news_with_category')
-      .select('id, title, link, description, image_url, source_name, published_at, category_id, category_name, category_emoji')
+      .select('id, hash, title, link, description, image_url, source_name, published_at, category_id, category_name, category_emoji') // ✅ Richiesto anche hash
       .order('priority', { ascending: true })
       .order('published_at', { ascending: false })
       .limit(opts.limit ?? 30);
@@ -52,10 +55,10 @@ export async function fetchLatestNews(opts: { limit?: number; categoryId?: strin
     // ignore
   }
 
-  // Fallback
+  // Fallback sulla tabella principale
   const { data } = await supabase
     .from('news_items')
-    .select('id, title, link, description, image_url, source_name, published_at')
+    .select('id, hash, title, link, description, image_url, source_name, published_at') // ✅ Richiesto anche hash
     .order('priority', { ascending: true })
     .order('published_at', { ascending: false })
     .limit(opts.limit ?? 30);
@@ -73,7 +76,7 @@ export async function fetchNewsPage(opts: {
   try {
     let q = supabase
       .from('news_with_category')
-      .select('id, title, link, description, image_url, source_name, published_at, category_id, category_name, category_emoji, priority, source_id')
+      .select('id, hash, title, link, description, image_url, source_name, published_at, category_id, category_name, category_emoji, priority, source_id')
       .order('published_at', { ascending: false })
       .limit(opts.limit ?? 20);
     if (opts.before) q = q.lt('published_at', opts.before);
@@ -85,7 +88,7 @@ export async function fetchNewsPage(opts: {
 
   let q = supabase
     .from('news_items')
-    .select('id, title, link, description, image_url, source_name, published_at')
+    .select('id, hash, title, link, description, image_url, source_name, published_at')
     .order('published_at', { ascending: false })
     .limit(opts.limit ?? 20);
   if (opts.before) q = q.lt('published_at', opts.before);
@@ -100,7 +103,7 @@ export async function searchNews(query: string, limit = 30): Promise<NewsCardDat
   const supabase = await createClient();
   const { data } = await supabase
     .from('news_items')
-    .select('id, title, link, description, image_url, source_name, published_at')
+    .select('id, hash, title, link, description, image_url, source_name, published_at')
     .ilike('title', `%${query}%`)
     .order('published_at', { ascending: false })
     .limit(limit);
@@ -112,8 +115,8 @@ export async function fetchNewsById(id: string): Promise<NewsCardData | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('news_items')
-    .select('id, title, link, description, image_url, source_name, published_at')
-    .eq('id', id)
+    .select('id, hash, title, link, description, image_url, source_name, published_at')
+    .eq('hash', id) // ✅ Cerca per hash se l'id non è mappato primario
     .maybeSingle();
   return data ? toCard(data as AnyRow) : null;
 }
@@ -138,12 +141,12 @@ export async function fetchTickerItems(): Promise<
   const supabase = await createClient();
   const { data } = await supabase
     .from('news_items')
-    .select('id, title, link, source_name')
+    .select('id, hash, title, link, source_name')
     .order('priority', { ascending: true })
     .order('published_at', { ascending: false })
     .limit(14);
   return ((data ?? []) as AnyRow[]).map((r) => ({
-    id: String(r.id),
+    id: r.id ? String(r.id) : (r.hash ? String(r.hash) : ''),
     title: String(r.title ?? ''),
     link: String(r.link ?? ''),
     source_name: String(r.source_name ?? ''),
