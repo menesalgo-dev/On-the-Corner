@@ -1,7 +1,7 @@
 /**
  * components/news/NewsCard.tsx
  * Card notizia con 3 varianti: hero, default, compact.
- * Allineato con la proprietà delle Props di BookmarkButton.
+ * Corretto: Naviga sulle pagine interne di dettaglio usando l'hash.
  */
 import Link from 'next/link';
 import Image from 'next/image';
@@ -42,13 +42,8 @@ export function NewsCard({ news, isBookmarked = false, variant = 'default' }: Pr
 function HeroVariant({ news, isBookmarked }: InternalProps) {
   return (
     <article className="group relative overflow-hidden rounded-3xl border border-[#1f1f1f] bg-[#0d0d0d] transition hover:border-[#e8c800]/40">
-      <Link
-        href={news.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        prefetch={false}
-        className="block"
-      >
+      {/* CORREZIONE: Punta al dettaglio interno /news/[hash] senza target _blank */}
+      <Link href={`/news/${news.id}`} prefetch={false} className="block">
         <div className="relative aspect-[16/9] w-full sm:aspect-[21/9]">
           {news.image_url ? (
             <Image
@@ -96,7 +91,6 @@ function HeroVariant({ news, isBookmarked }: InternalProps) {
         </div>
       </Link>
       <div className="absolute right-4 top-4 z-10">
-        {/* FIX LINEA 98: Sostituito newsId={news.id} con newsHash={news.id} */}
         <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
       </div>
     </article>
@@ -106,13 +100,8 @@ function HeroVariant({ news, isBookmarked }: InternalProps) {
 function DefaultVariant({ news, isBookmarked }: InternalProps) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] transition hover:-translate-y-1 hover:border-[#e8c800]/40 hover:shadow-[0_14px_40px_-20px_rgba(232,200,0,0.35)]">
-      <Link
-        href={news.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        prefetch={false}
-        className="block"
-      >
+      {/* CORREZIONE: Punta al dettaglio interno /news/[hash] senza target _blank */}
+      <Link href={`/news/${news.id}`} prefetch={false} className="block">
         <div className="relative aspect-[16/9] w-full overflow-hidden">
           {news.image_url ? (
             <Image
@@ -158,7 +147,6 @@ function DefaultVariant({ news, isBookmarked }: InternalProps) {
         ) : (
           <span />
         )}
-        {/* FIX RIGHE SUCCESSIVE: Sostituito newsId={news.id} con newsHash={news.id} */}
         <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
       </div>
     </article>
@@ -168,13 +156,8 @@ function DefaultVariant({ news, isBookmarked }: InternalProps) {
 function CompactVariant({ news }: InternalProps) {
   return (
     <article className="group flex gap-3 rounded-xl border border-[#1f1f1f] bg-[#0d0d0d] p-2.5 transition hover:border-[#e8c800]/40">
-      <Link
-        href={news.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        prefetch={false}
-        className="flex flex-1 gap-3"
-      >
+      {/* CORREZIONE: Punta al dettaglio interno /news/[hash] senza target _blank */}
+      <Link href={`/news/${news.id}`} prefetch={false} className="flex flex-1 gap-3">
         <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-lg">
           {news.image_url ? (
             <Image
