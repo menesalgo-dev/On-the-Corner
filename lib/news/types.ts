@@ -1,7 +1,6 @@
 /**
  * lib/news/types.ts
- * Tipi condivisi tra RSS parser e integratori API esterne.
- * Allineato al 100% alla struttura dati fisica del Database e di NewsCard.
+ * Tipi condivisi e normalizzazione record PostgreSQL (Supabase) in NewsCardData.
  */
 import type { CategoryId } from '@/lib/rss/config';
 
@@ -20,9 +19,8 @@ export interface NewsItem {
   categoryId: CategoryId;
 }
 
-// L'interfaccia originale della card diventa il contratto di passaggio dati globale
 export interface NewsCardData {
-  id: string; // Rappresenta l'hash logico della notizia
+  id: string; // Hash SHA-1 logico della notizia
   title: string;
   link: string;
   description: string | null;
@@ -105,10 +103,6 @@ export function similarity(a: string, b: string): number {
   return 1 - ((dp[m] as number[])[n] as number) / Math.max(m, n);
 }
 
-/**
- * Converte i record grezzi estratti in snake_case dal database Supabase
- * nell'oggetto tipizzato NewsCardData applicando la sanificazione dei protocolli multimediali.
- */
 export function toNewsCardData(row: any): NewsCardData {
   const categoryMeta: Record<string, { name: string; emoji: string }> = {
     '1': { name: 'Calcio', emoji: '⚽' },
@@ -119,17 +113,30 @@ export function toNewsCardData(row: any): NewsCardData {
 
   const meta = categoryMeta[String(row.category_id || '')];
 
-  // FIX KILLER IMMAGINI: Forza il protocollo HTTPS sicuro per evitare blocchi Mixed Content di Next.js
   let cleanImageUrl = row.image_url || row.imageUrl || null;
-  if (cleanImageUrl && cleanImageUrl.startsWith('http://')) {
-    cleanImageUrl = cleanImageUrl.replace('http://', 'https://');
+  if (cleanImageUrl && typeof cleanImageUrl === 'string') {
+    cleanImageUrl = cleanImageUrl.trim();
+    if (cleanImageUrl.startsWith('http://')) {
+      cleanImageUrl = cleanImageUrl.replace('http://', 'https://');
+    }
+    cleanImageUrl = cleanImageUrl
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s/g, '%20');
+
+    if (cleanImageUrl.includes('data:image/') || cleanImageUrl.endsWith('.svg') || cleanImageUrl.includes('placeholder')) {
+      cleanImageUrl = null;
+    }
+  } else {
+    cleanImageUrl = null;
   }
 
   return {
     id: row.hash,
     title: row.title || '',
     link: row.link || row.url || '',
-    description: row.description || row.summary || null, // Intercetta entrambi i campi del cron
+    description: row.description || row.summary || row.content || null,
     image_url: cleanImageUrl,
     source_name: row.source_name || row.source || 'Premium Source',
     published_at: row.published_at,
