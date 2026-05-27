@@ -1,12 +1,12 @@
 /**
  * app/news/[id]/page.tsx
  * Dettaglio singola notizia identificata tramite hash univoco.
- * Mostra immagine grande + descrizione + pulsante link esterno originale.
+ * Mostra immagine grande + Box Sinossi Editoriale + pulsante link esterno originale.
  */
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ExternalLink, ArrowLeft } from 'lucide-react';
+import { ExternalLink, ArrowLeft, FileText } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
@@ -16,7 +16,6 @@ import { fetchNewsByHash, fetchLatestNews, fetchUserBookmarkHashes } from '@/lib
 import { formatRelative } from '@/lib/utils';
 import { toNewsCardData } from '@/lib/news/types';
 
-// Rigenerazione incrementale (ISR) mantenuta a 10 minuti come da blueprint
 export const revalidate = 600;
 
 interface PageProps { params: Promise<{ id: string }>; }
@@ -50,7 +49,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
     <>
       <Header />
       <main className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12 bg-[#080808]">
-        <Link href="/news" className="mb-6 inline-flex items-center gap-1.5 text-xs uppercase tracking-widest text-zinc-500 transition hover:text-[#e8c800]" style={{ fontFamily: 'var(--font-digest-mono)' }}>
+        <Link href="/news" className="mb-6 inline-flex items-center gap-1.5 text-xs uppercase tracking-widest text-zinc-500 transition hover:text-[#e8c800]" style={{ fontFamily: 'var(--font-dm-mono)' }}>
           <ArrowLeft className="h-3.5 w-3.5" /> Indietro
         </Link>
 
@@ -69,25 +68,48 @@ export default async function NewsDetailPage({ params }: PageProps) {
             </span>
           </div>
 
-          <h1 className="text-2xl uppercase leading-tight tracking-tight text-white sm:text-4xl font-black" style={{ fontFamily: 'var(--font-archivo-black)' }}>
+          <h1 className="text-2xl uppercase leading-tight tracking-tight text-white sm:text-4xl font-black mb-6" style={{ fontFamily: 'var(--font-archivo-black)' }}>
             {news.title}
           </h1>
 
+          {/* Immagine Copertina Sbloccata */}
           {news.image_url && (
-            <div className="relative mt-6 aspect-[16/9] w-full overflow-hidden rounded-2xl border border-zinc-800">
-              <Image src={news.image_url} alt="" fill sizes="(min-width: 768px) 800px, 100vw" className="object-cover" unoptimized priority />
+            <div className="relative aspect-[16/9] w-full overflow-hidden rounded-2xl border border-zinc-800 bg-[#141414]">
+              <Image 
+                src={news.image_url} 
+                alt="" 
+                fill 
+                sizes="(min-width: 768px) 800px, 100vw" 
+                className="object-cover" 
+                unoptimized 
+                priority 
+              />
             </div>
           )}
 
-          {news.description && <p className="mt-6 text-base leading-relaxed text-zinc-300 sm:text-lg">{news.description}</p>}
+          {/* 📝 NUOVA SEZIONE: BOX SINOSSI EDITORIALE */}
+          <div className="mt-8 rounded-2xl border border-zinc-900 bg-[#080808] p-5 md:p-6">
+            <div className="flex items-center gap-2 mb-3 text-[#e8c800] text-xs font-mono uppercase tracking-wider">
+              <FileText className="h-4 w-4" />
+              Sinossi Articolo
+            </div>
+            {news.description ? (
+              <p className="text-zinc-300 text-sm leading-relaxed sm:text-base">
+                {news.description}
+              </p>
+            ) : (
+              <p className="text-zinc-500 text-sm italic">
+                Nessun riassunto testuale disponibile per questo feed. Clicca sul pulsante sottostante per consultare il report completo.
+              </p>
+            )}
+          </div>
 
+          {/* Barra delle Azioni Inferiore */}
           <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-[#1f1f1f] pt-6">
             <Link href={news.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-[#e8c800] px-5 py-3 text-sm uppercase tracking-wider text-black font-black transition hover:scale-[1.02]" style={{ fontFamily: 'var(--font-archivo-black)' }}>
-              Leggi su {news.source_name} <ExternalLink className="h-4 w-4" />
+              Leggi l&apos;articolo su {news.source_name} <ExternalLink className="h-4 w-4" />
             </Link>
-            
             <div className="flex items-center gap-2 ml-sm-auto">
-              {/* FIX ALLINEAMENTO PROPS: Cambiato newsId={news.id} in newsHash={news.id} */}
               <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
               <span className="text-xs text-zinc-500 font-mono hidden sm:inline">
                 {isBookmarked ? 'Salvata nei preferiti' : 'Salva per dopo'}
@@ -96,6 +118,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
           </div>
         </article>
 
+        {/* Sezione Notizie Correlate */}
         {otherNews.length > 0 && (
           <section className="mt-12 border-t border-zinc-900 pt-8">
             <h2 className="mb-6 text-base uppercase tracking-tight text-white sm:text-xl font-black" style={{ fontFamily: 'var(--font-archivo-black)' }}>
