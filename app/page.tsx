@@ -1,185 +1,87 @@
 /**
  * app/page.tsx
- * Homepage media: hero notizia + grid + tab + sidebar + live strip.
+ * Homepage dell'aggregatore sportivo premium.
+ * Interamente allineata alle funzioni stabili basate sull'hash logico.
  */
-import { Suspense } from 'react';
-import Link from 'next/link';
+import React from 'react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { Ticker } from '@/components/layout/Ticker';
-import { LiveStrip } from '@/components/layout/LiveStrip';
-import { NewsCard, NewsCardSkeleton } from '@/components/news/NewsCard';
-import { CategoryTabs } from '@/components/news/CategoryTabs';
-import { EmptyState } from '@/components/shared/EmptyState';
-import {
-  fetchLatestNews,
-  fetchUserBookmarkIds,
-  fetchTickerItems,
-  fetchCategoryCounts,
-  fetchNewsStats,
-  fetchCategories,
-} from '@/lib/news';
+import { NewsCard } from '@/components/news/NewsCard';
+import { fetchLatestNews, fetchUserBookmarkHashes } from '@/lib/news';
+import { toNewsCardData } from '@/lib/news/types';
 
+// Forza la rigenerazione dinamica in tempo reale a ogni visita eliminando il vuoto statico
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-interface PageProps {
-  searchParams: Promise<{ category?: string }>;
-}
+export default async function HomePage() {
+  // Recupero parallelo delle notizie recenti e del set di hash salvati nei preferiti
+  const [rawNews, bookmarkHashes] = await Promise.all([
+    fetchLatestNews({ limit: 12 }), // Recupera le ultime 12 notizie in evidenza per la home
+    fetchUserBookmarkHashes()
+  ]);
 
-export default async function HomePage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const tickerItems = await fetchTickerItems();
-  const currentCategory = params.category || 'tutto';
+  // Conversione pulita dei record PostgreSQL in oggetti NewsCardData (SnakeCase) attesi nativamente
+  const featuredNews = (rawNews || []).map((row: any) => toNewsCardData(row));
+
+  // Isolianto della prima notizia per la variante "hero" grande, le altre vanno nella griglia standard
+  const heroItem = featuredNews[0];
+  const gridItems = featuredNews.slice(1);
 
   return (
-    <>
+    <div className="min-h-screen bg-[#080808] text-white">
       <Header />
-      <Ticker items={tickerItems} />
 
-      <main className="mx-auto max-w-[1320px] px-4 pb-24 pt-4 sm:px-6 sm:pb-12 sm:pt-6">
-        <Suspense fallback={<TabsFallback />}>
-          <CategoryTabsServer activeId={currentCategory} />
-        </Suspense>
+      <main className="mx-auto max-w-[1400px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12">
+        
+        {/* Sezione Notizia Hero in Evidenza */}
+        {heroItem && (
+          <section className="mb-10">
+            <h2 
+              className="mb-4 text-xs font-mono tracking-widest text-zinc-500 uppercase"
+              style={{ fontFamily: 'var(--font-dm-mono)' }}
+            >
+              // In evidenza ora
+            </h2>
+            <NewsCard 
+              news={heroItem} 
+              isBookmarked={bookmarkHashes.has(heroItem.id)} 
+              variant="hero" 
+            />
+          </section>
+        )}
 
-        <Suspense fallback={<HomepageSkeleton />}>
-          <HomepageContent categoryId={currentCategory} />
-        </Suspense>
+        {/* Griglia delle ultime notizie */}
+        <section>
+          <div className="flex items-center justify-between mb-6 border-b border-zinc-900 pb-3">
+            <h2 
+              className="text-xl uppercase tracking-tight font-black"
+              style={{ fontFamily: 'var(--font-archivo-black)' }}
+            >
+              Ultime <span className="text-[#e8c800]">Notizie</span>
+            </h2>
+          </div>
+
+          {gridItems.length === 0 && !heroItem ? (
+            <p className="text-sm text-zinc-500 font-mono">Nessuna notizia disponibile nel feed di oggi.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {gridItems.map((item) => (
+                <NewsCard 
+                  key={item.id} 
+                  news={item} 
+                  isBookmarked={bookmarkHashes.has(item.id)} 
+                  variant="default"
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </main>
 
       <Footer />
       <BottomNav />
-    </>
-  );
-}
-
-async function CategoryTabsServer({ activeId }: { activeId?: string }) {
-  const [cats, counts] = await Promise.all([fetchCategories(), fetchCategoryCounts()]);
-  const tabs = cats.map((c) => ({
-    id: c.id,
-    name: c.short_name ?? c.name,
-    emoji: c.emoji ?? undefined,
-    count: counts.get(c.id) ?? 0,
-  }));
-  return <CategoryTabs tabs={tabs} activeId={activeId} basePath="/" />;
-}
-
-async function HomepageContent({ categoryId }: { categoryId?: string }) {
-  const [news, bookmarks, stats] = await Promise.all([
-    fetchLatestNews({ limit: 25, categoryId }),
-    fetchUserBookmarkIds(),
-    fetchNewsStats(),
-  ]);
-
-  if (!news || news.length === 0) {
-    return (
-      <EmptyState
-        emoji="📰"
-        title="Nessuna notizia"
-        description="Le notizie verranno popolate dal cron sync-news o dal sync manuale. Attendi qualche minuto."
-      />
-    );
-  }
-
-  const [hero, ...rest] = news;
-
-  return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
-      <div className="space-y-6">
-        {hero && <NewsCard news={hero} isBookmarked={bookmarks.has(hero.id)} variant="hero" />}
-
-        <LiveStrip />
-
-        <section>
-          <header className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-base uppercase tracking-tight text-white sm:text-xl" style={{ fontFamily: 'var(--font-archivo-black)' }}>
-              In <span className="text-[#e8c800]">Evidenza</span>
-            </h2>
-            <Link href="/news" className="text-[11px] uppercase tracking-widest text-zinc-400 transition hover:text-[#e8c800]" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-              Tutte →
-            </Link>
-          </header>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {rest.slice(0, 9).map((item) => (
-              <NewsCard key={item.id} news={item} isBookmarked={bookmarks.has(item.id)} />
-            ))}
-          </div>
-        </section>
-
-        {rest.length > 9 && (
-          <section>
-            <header className="mb-4">
-              <h2 className="text-base uppercase tracking-tight text-white sm:text-xl" style={{ fontFamily: 'var(--font-archivo-black)' }}>
-                Altre <span className="text-[#e8c800]">Notizie</span>
-              </h2>
-            </header>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {rest.slice(9).map((item) => (
-                <NewsCard key={item.id} news={item} isBookmarked={bookmarks.has(item.id)} variant="compact" />
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
-
-      <aside className="hidden space-y-4 lg:block">
-        <SidebarPanel title="Fonti">
-          <ul className="space-y-2.5 text-sm">
-            {stats.sources.slice(0, 12).map((s) => (
-              <li key={s.id} className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${s.count >= 5 ? 'bg-emerald-500 shadow-[0_0_6px_currentColor]' : s.count > 0 ? 'bg-[#e8c800]' : 'bg-zinc-700'}`} />
-                  <span className="text-white">{s.name}</span>
-                </span>
-                <span className="text-xs tabular-nums text-zinc-400" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-                  {s.count}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </SidebarPanel>
-
-        <SidebarPanel title="Personalizza">
-          <p className="mb-3 text-xs text-zinc-400">
-            Crea un account per seguire le tue squadre e ricevere un feed personalizzato.
-          </p>
-          <Link href="/signup" className="block rounded-xl bg-[#e8c800] py-2.5 text-center text-xs uppercase tracking-wider text-black transition hover:scale-[1.02]" style={{ fontFamily: 'var(--font-archivo-black)' }}>
-            Inizia gratis
-          </Link>
-        </SidebarPanel>
-      </aside>
-    </div>
-  );
-}
-
-function SidebarPanel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] p-5">
-      <h3 className="mb-4 flex items-center gap-3 text-[10px] uppercase tracking-[0.15em] text-zinc-500" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-        {title}
-        <span className="h-px flex-1 bg-[#1f1f1f]" />
-      </h3>
-      {children}
-    </section>
-  );
-}
-
-function TabsFallback() {
-  return <div className="h-[52px]" />;
-}
-
-function HomepageSkeleton() {
-  return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
-      <div className="space-y-6">
-        <NewsCardSkeleton variant="hero" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <NewsCardSkeleton key={i} />
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
