@@ -1,9 +1,9 @@
 /**
  * lib/news.ts
- * Funzioni di lettura news dal DB con caching.
+ * Funzioni di lettura news dal DB con privilegi di servizio.
  */
 import 'server-only';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import type { NewsCardData } from '@/components/news/NewsCard';
 
 interface AnyRow {
@@ -21,7 +21,6 @@ interface AnyRow {
 }
 
 function toCard(r: AnyRow): NewsCardData {
-  // Se l'id primario non è mappato usa l'hash inserito dal cron job
   const finalId = r.id ? String(r.id) : (r.hash ? String(r.hash) : '');
 
   return {
@@ -38,33 +37,25 @@ function toCard(r: AnyRow): NewsCardData {
   };
 }
 
-/** Ultime N notizie, pescate direttamente dalla tabella per saltare la vista relazionale corrotta */
+/** Ultime N notizie filtrate per categoria direttamente dalla tabella */
 export async function fetchLatestNews(opts: { limit?: number; categoryId?: string } = {}): Promise<NewsCardData[]> {
-  const supabase = await createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   
   try {
-    // Interroghiamo direttamente la tabella news_items per bypassare i problemi della vista
     let q = supabase
       .from('news_items')
       .select('id, hash, title, link, description, image_url, source_name, published_at, category_id')
-      .order('published_at', { ascending: false }) // Ordina per le più recenti
+      .order('published_at', { ascending: false })
       .limit(opts.limit ?? 30);
       
-    // Applica il filtro testuale ('calcio', 'f1', 'tennis') verificato nel DB
     if (opts.categoryId && opts.categoryId !== 'tutto') {
       q = q.eq('category_id', opts.categoryId);
     }
     
     const { data, error } = await q;
-    
-    if (error) {
-      console.error("Errore Supabase nella fetchLatestNews:", error.message);
-      return [];
-    }
-    
+    if (error) return [];
     return ((data ?? []) as AnyRow[]).map(toCard);
-  } catch (err) {
-    console.error("Errore critico in fetchLatestNews:", err);
+  } catch {
     return [];
   }
 }
@@ -76,7 +67,7 @@ export async function fetchNewsPage(opts: {
   sourceId?: string;
   categoryId?: string;
 }): Promise<NewsCardData[]> {
-  const supabase = await createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   try {
     let q = supabase
       .from('news_items')
@@ -96,7 +87,7 @@ export async function fetchNewsPage(opts: {
 /** Ricerca full-text */
 export async function searchNews(query: string, limit = 30): Promise<NewsCardData[]> {
   if (!query.trim()) return [];
-  const supabase = await createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data } = await supabase
     .from('news_items')
     .select('id, hash, title, link, description, image_url, source_name, published_at')
@@ -108,7 +99,7 @@ export async function searchNews(query: string, limit = 30): Promise<NewsCardDat
 
 /** Notizia per id/hash */
 export async function fetchNewsById(id: string): Promise<NewsCardData | null> {
-  const supabase = await createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data } = await supabase
     .from('news_items')
     .select('id, hash, title, link, description, image_url, source_name, published_at, category_id')
@@ -119,7 +110,7 @@ export async function fetchNewsById(id: string): Promise<NewsCardData | null> {
 
 /** Bookmarks dell'utente corrente */
 export async function fetchUserBookmarkIds(): Promise<Set<string>> {
-  const supabase = await createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return new Set();
@@ -138,7 +129,7 @@ export async function fetchUserBookmarkIds(): Promise<Set<string>> {
 export async function fetchTickerItems(): Promise<
   { id: string; title: string; link: string; source_name: string }[]
 > {
-  const supabase = await createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data } = await supabase
     .from('news_items')
     .select('id, hash, title, link, source_name')
@@ -157,7 +148,7 @@ export async function fetchNewsStats(): Promise<{
   total: number;
   sources: { id: string; name: string; count: number }[];
 }> {
-  const supabase = await createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { count } = await supabase
     .from('news_items')
     .select('*', { count: 'exact', head: true });
@@ -180,9 +171,9 @@ export async function fetchNewsStats(): Promise<{
   };
 }
 
-/** Conteggi per categoria */
+/** Conteggi reali per categoria */
 export async function fetchCategoryCounts(): Promise<Map<string, number>> {
-  const supabase = await createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   try {
     const { data } = await supabase.from('news_items').select('category_id');
     const m = new Map<string, number>();
@@ -198,7 +189,7 @@ export async function fetchCategoryCounts(): Promise<Map<string, number>> {
   }
 }
 
-/** Categorie fittizie hardcoded per sbloccare i pulsanti del menu se la tabella categories è vuota */
+/** Categorie fittizie hardcoded per sbloccare i filtri */
 export async function fetchCategories(): Promise<
   { id: string; name: string; short_name: string | null; emoji: string | null; sort_order: number }[]
 > {
