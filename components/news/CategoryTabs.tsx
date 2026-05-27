@@ -21,42 +21,44 @@ interface Props {
 
 export function CategoryTabs({ tabs, activeId, basePath }: Props) {
   return (
-    {/* Slider Orizzontale a Scorrimento Liquido con plugin scrollbar-none inline */}
-    <div className="overflow-x-auto scrollbar-none border-b border-otc-line/60 mb-6">
-      <nav className="flex gap-1 whitespace-nowrap min-w-max pb-px">
-        {/* Tab di controllo globale "Tutto" */}
-        <Tab
-          href={basePath}
-          active={!activeId || activeId === 'tutto'}
-          label="Tutti gli Sport"
-        />
-        
-        {/* Generazione dinamica delle discipline sportive del database */}
-        {tabs.map((t) => (
+    <>
+      {/* CORREZIONE: Il commento ora si trova in un contesto React valido e non rompe il tag div successivo */}
+      <div className="overflow-x-auto scrollbar-none border-b border-otc-line/60 mb-6">
+        <nav className="flex gap-1 whitespace-nowrap min-w-max pb-px">
+          {/* Tab di controllo globale "Tutto" */}
           <Tab
-            key={t.id}
-            href={`${basePath}?category=${t.id}`}
-            active={activeId?.toLowerCase() === t.id.toLowerCase()}
-            label={
-              <span className="inline-flex items-center">
-                {/* Il nome dello sport perde l'emoji gigante per un look editoriale pulito */}
-                <span>{t.name}</span>
-                
-                {/* Micro-badge per il contatore dei record se popolato e maggiore di 0 */}
-                {t.count !== undefined && t.count > 0 && (
-                  <span
-                    className="ml-1.5 rounded bg-otc-line px-1.5 py-0.5 font-mono text-[9px] font-bold text-zinc-500 transition-colors group-hover:text-otc-accent"
-                    style={{ fontFamily: 'var(--font-mono)' }}
-                  >
-                    {t.count}
-                  </span>
-                )}
-              </span>
-            }
+            href={basePath}
+            active={!activeId || activeId === 'tutto'}
+            label="Tutti gli Sport"
           />
-        ))}
-      </nav>
-    </div>
+          
+          {/* Generazione dinamica delle discipline sportive del database */}
+          {tabs.map((t) => (
+            <Tab
+              key={t.id}
+              href={`${basePath}?category=${t.id}`}
+              active={activeId?.toLowerCase() === t.id.toLowerCase()}
+              label={
+                <span className="inline-flex items-center">
+                  {/* Il nome dello sport perde l'emoji gigante per un look editoriale pulito */}
+                  <span>{t.name}</span>
+                  
+                  {/* Micro-badge per il contatore dei record se popolato e maggiore di 0 */}
+                  {t.count !== undefined && t.count > 0 && (
+                    <span
+                      className="ml-1.5 rounded bg-otc-line px-1.5 py-0.5 font-mono text-[9px] font-bold text-zinc-500 transition-colors group-hover:text-otc-accent"
+                      style={{ fontFamily: 'var(--font-mono)' }}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </span>
+              }
+            />
+          ))}
+        </nav>
+      </div>
+    </>
   );
 }
 
