@@ -21,7 +21,8 @@ import {
   fetchCategories,
 } from '@/lib/news';
 
-export const revalidate = 120; // ogni 2 minuti
+// ✅ CORREZIONE 1: Sostituito revalidate statico. Forziamo il caricamento in tempo reale a ogni visita.
+export const dynamic = 'force-dynamic';
 
 interface PageProps {
   searchParams: Promise<{ category?: string }>;
@@ -42,6 +43,7 @@ export default async function HomePage({ searchParams }: PageProps) {
         </Suspense>
 
         <Suspense fallback={<HomepageSkeleton />}>
+          {/* Passiamo il parametro letto per interrogare Supabase */}
           <HomepageContent categoryId={params.category} />
         </Suspense>
       </main>
