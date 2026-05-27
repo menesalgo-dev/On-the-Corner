@@ -1,8 +1,9 @@
 /**
  * components/layout/LiveStrip.tsx
- * Strip orizzontale match live. Placeholder per W4 (API sport).
- * Per ora mostra messaggio "Live in arrivo" se non ci sono match.
+ * Strip orizzontale dei match live ed eventi sportivi in tempo reale.
+ * Allineato con la palette otc, icone miniaturizzate e scorrimento invisibile.
  */
+import React from 'react';
 import Link from 'next/link';
 import { Radio } from 'lucide-react';
 
@@ -22,19 +23,20 @@ interface Props {
 }
 
 export function LiveStrip({ matches = [] }: Props) {
-  // Se non ci sono match passati, mostra placeholder informativo
+  // Se non ci sono match passati, mostra il blocco placeholder informativo minimale
   if (matches.length === 0) {
     return (
-      <section className="rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] p-4">
+      <section className="rounded-xl border border-otc-line bg-otc-surface p-3.5">
         <div className="flex items-center gap-2">
-          <span
-            className="inline-flex h-2 w-2 rounded-full bg-red-500"
-            style={{ animation: 'pulse-dot 1.6s ease-in-out infinite' }}
-          />
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500" style={{ fontFamily: 'var(--font-dm-mono)' }}>
+          {/* Pallino Micro pulsante allineato alle nuove keyframes di sistema */}
+          <span className="inline-flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse-dot" />
+          <span 
+            className="text-[9px] font-mono uppercase tracking-widest text-zinc-500" 
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
             Live ora
           </span>
-          <span className="ml-auto text-xs text-zinc-500">
+          <span className="ml-auto text-xs text-zinc-500 tracking-tight">
             Match live in arrivo nelle prossime settimane
           </span>
         </div>
@@ -43,46 +45,56 @@ export function LiveStrip({ matches = [] }: Props) {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d]">
-      <header className="flex items-center justify-between border-b border-[#1f1f1f] px-4 py-2.5">
+    <section className="overflow-hidden rounded-xl border border-otc-line bg-otc-surface">
+      <header className="flex items-center justify-between border-b border-otc-line px-4 py-2 bg-otc-bg/40">
         <div className="flex items-center gap-2">
-          <Radio className="h-4 w-4 text-red-500" style={{ animation: 'pulse-dot 1.6s ease-in-out infinite' }} />
-          <span className="text-[11px] uppercase tracking-widest text-white" style={{ fontFamily: 'var(--font-archivo-black)' }}>
+          <Radio className="h-3.5 w-3.5 text-red-500 animate-pulse-dot" />
+          <span 
+            className="text-[10px] uppercase tracking-widest text-zinc-200 font-bold" 
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
             Live ora
           </span>
-          <span className="rounded-md bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-400">
+          <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-400">
             {matches.length}
           </span>
         </div>
         <Link
           href="/live"
-          className="text-[10px] uppercase tracking-widest text-zinc-400 transition hover:text-[#e8c800]"
-          style={{ fontFamily: 'var(--font-dm-mono)' }}
+          className="text-[9px] font-mono uppercase tracking-wider text-zinc-500 transition hover:text-otc-accent"
+          style={{ fontFamily: 'var(--font-mono)' }}
         >
-          Tutti →
+          Vedi Tutti →
         </Link>
       </header>
 
-      <div className="flex gap-2 overflow-x-auto p-3 scrollbar-hide">
+      {/* Slider Orizzontale a Scorrimento Liquido con plugin scrollbar-none inline */}
+      <div className="flex gap-2 overflow-x-auto p-2.5 scrollbar-none bg-[#050507]">
         {matches.map((m) => (
           <Link
             key={m.id}
             href={`/live/${m.id}`}
-            className="flex shrink-0 items-center gap-3 rounded-xl border border-[#1f1f1f] bg-[#141414] px-3 py-2 transition hover:border-[#e8c800]/40"
+            className="flex shrink-0 items-center gap-3 rounded-lg border border-otc-line bg-otc-surface px-3 py-1.5 transition hover:border-otc-accent/30"
           >
-            <span className="rounded bg-[#e8c800]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#e8c800]">
+            <span className="rounded bg-otc-accent/10 px-1.5 py-0.5 text-[8px] font-mono font-bold uppercase tracking-wider text-otc-accent">
               {m.sport}
             </span>
-            <span className="text-sm text-white">{m.homeTeam}</span>
+            <span className="text-xs text-zinc-200 font-medium tracking-tight">{m.homeTeam}</span>
             {m.homeScore !== undefined && (
-              <span className="font-bold text-white" style={{ fontFamily: 'var(--font-dm-mono)' }}>
+              <span 
+                className="font-mono text-xs font-bold text-zinc-100 bg-otc-line px-1.5 py-0.5 rounded" 
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
                 {m.homeScore}–{m.awayScore}
               </span>
             )}
-            {m.awayTeam && <span className="text-sm text-white">{m.awayTeam}</span>}
+            {m.awayTeam && <span className="text-xs text-zinc-200 font-medium tracking-tight">{m.awayTeam}</span>}
             {m.minute && (
-              <span className="text-[11px] text-[#e8c800]" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-                {m.minute}
+              <span 
+                className="text-[10px] font-mono text-otc-accent font-semibold animate-pulse-dot" 
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
+                {m.minute}&apos;
               </span>
             )}
           </Link>
