@@ -13,14 +13,16 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // 🎨 NUOVO DESIGN SYSTEM OTC: Palette cromatica Premium Minimal & Slate
         otc: {
-          bg: '#080808',
-          surface: '#0d0d0d',
-          'surface-2': '#141414',
-          line: '#1f1f1f',
+          bg: '#040405',         // Nero profondo editoriale (riduce l'emissione luminosa)
+          surface: '#09090b',    // Superficie opaca raffinata per card e moduli
+          'surface-2': '#0f0f12', // Secondo livello di stacco per sezioni ad isola/sinossi
+          line: '#161619',       // Micro-linee geometriche sottili per i bordi
 
-          accent: '#e8c800',
-          'accent-2': '#ffe25a',
+          // Sostituzione del giallo neon con un nobile Oro Ambrato Metallico
+          accent: '#d4af37',     
+          'accent-2': '#f5c453', 
 
           danger: '#ef4444',
         },
@@ -32,9 +34,10 @@ const config: Config = {
         mono: ['var(--font-dm-mono)', 'ui-monospace', 'monospace'],
       },
 
+      // Bagliori ammorbiditi e fusi con l'oro metallico
       boxShadow: {
-        glow: '0 0 24px rgba(232,200,0,0.35)',
-        'glow-lg': '0 0 48px rgba(232,200,0,0.55)',
+        glow: '0 0 20px rgba(212,175,55,0.15)',
+        'glow-lg': '0 0 40px rgba(212,175,55,0.25)',
       },
 
       borderRadius: {
@@ -44,10 +47,10 @@ const config: Config = {
       keyframes: {
         'pulse-glow': {
           '0%,100%': {
-            boxShadow: '0 0 0 rgba(232,200,0,0)',
+            boxShadow: '0 0 0 rgba(212,175,55,0)',
           },
           '50%': {
-            boxShadow: '0 0 24px rgba(232,200,0,0.55)',
+            boxShadow: '0 0 20px rgba(212,175,55,0.3)',
           },
         },
 
@@ -57,20 +60,23 @@ const config: Config = {
             transform: 'scale(1)',
           },
           '50%': {
-            opacity: '.4',
-            transform: 'scale(.8)',
+            opacity: '.5',
+            transform: 'scale(.9)', // Ridotto lo stacco dimensionale dell'animazione
           },
         },
       },
 
       animation: {
-        'pulse-glow': 'pulse-glow 2.4s ease-in-out infinite',
-        'pulse-dot': 'pulse-dot 1.6s ease-in-out infinite',
+        'pulse-glow': 'pulse-glow 3s ease-in-out infinite',
+        'pulse-dot': 'pulse-dot 2s ease-in-out infinite', // Rallentato per un effetto più elegante
       },
     },
   },
 
-  plugins: [],
+  plugins: [
+    // Plugin per nascondere le scrollbar nello slider liquido delle categorie
+    require('tailwind-scrollbar')({ nocompatible: true }),
+  ],
 };
 
 export default config;
