@@ -1,6 +1,6 @@
 /**
  * server/sync/run-sync.ts
- * Pipeline completa di sync con isolamento origin.
+ * Pipeline completa di sync allineata al database.
  */
 import { createClient } from '@supabase/supabase-js';
 import { fetchAllRssNews } from '@/lib/rss/parser';
@@ -92,24 +92,24 @@ interface NewsRow {
   lang: 'it' | 'en';
   priority: number;
   published_at: string;
-  tags: string[];
-  category_id: string;
+  tags: string; // Salvato come stringa JSON per compatibilità PG
+  category_id: string; // ✅ Mappato correttamente
 }
 
 function toRow(n: NewsItem): NewsRow {
   return {
     hash: n.hash,
-    source_id: n.sourceId,
+    source_id: n.sourceId || 'rss',
     source_name: n.sourceName,
     title: n.title.slice(0, 500),
     link: n.link,
     description: n.description ? n.description.slice(0, 1000) : null,
-    image_url: n.imageUrl,
-    lang: n.lang,
-    priority: n.priority,
-    published_at: n.publishedAt,
-    tags: n.tags,
-    category_id: n.categoryId,
+    image_url: n.imageUrl || null,
+    lang: n.lang || 'it',
+    priority: n.priority || 50,
+    published_at: n.publishedAt || new Date().toISOString(),
+    tags: JSON.stringify(n.tags || []),
+    category_id: n.categoryId || 'altro', // ✅ Inserisce il valore nella nuova colonna del DB
   };
 }
 
@@ -198,7 +198,6 @@ export async function runSync(): Promise<SyncResult> {
     upserted += count ?? batch.length;
   }
 
-  // Estendiamo leggermente l'intervallo di cleanup per evitare cancellazioni immediate dovute al fuso orario
   const threshold = new Date(Date.now() - (MAX_AGE_DAYS_IT + 2) * 86_400_000).toISOString();
   let deleted = 0;
   try {
