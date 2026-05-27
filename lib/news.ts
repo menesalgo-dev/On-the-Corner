@@ -21,6 +21,7 @@ interface AnyRow {
 }
 
 function toCard(r: AnyRow): NewsCardData {
+  // Se l'id primario bigint non è popolato, usa la stringa hash univoca inserita dal cron job
   const finalId = r.id ? String(r.id) : (r.hash ? String(r.hash) : '');
 
   return {
@@ -53,9 +54,13 @@ export async function fetchLatestNews(opts: { limit?: number; categoryId?: strin
     }
     
     const { data, error } = await q;
-    if (error) return [];
+    if (error) {
+      console.error("Errore fetchLatestNews Supabase:", error.message);
+      return [];
+    }
     return ((data ?? []) as AnyRow[]).map(toCard);
-  } catch {
+  } catch (err) {
+    console.error("Errore critico fetchLatestNews:", err);
     return [];
   }
 }
@@ -171,7 +176,7 @@ export async function fetchNewsStats(): Promise<{
   };
 }
 
-/** Conteggi reali per categoria */
+/** Conteggi reali raggruppati per categoria dal database */
 export async function fetchCategoryCounts(): Promise<Map<string, number>> {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   try {
@@ -189,7 +194,7 @@ export async function fetchCategoryCounts(): Promise<Map<string, number>> {
   }
 }
 
-/** Categorie fittizie hardcoded per sbloccare i filtri */
+/** Generazione delle categorie hardcoded per corrispondere alle tab del frontend */
 export async function fetchCategories(): Promise<
   { id: string; name: string; short_name: string | null; emoji: string | null; sort_order: number }[]
 > {
