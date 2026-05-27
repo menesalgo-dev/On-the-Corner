@@ -134,8 +134,12 @@ function toRow(n: NewsItem): NewsRow {
 export async function runSync(): Promise<SyncResult> {
   const t0 = Date.now();
 
-  const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+export async function runSync(): Promise<SyncResult> {
+  const t0 = Date.now();
+
+  let supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
   if (!supaUrl || !serviceRole) {
     return {
       ok: false,
@@ -152,8 +156,17 @@ export async function runSync(): Promise<SyncResult> {
     };
   }
 
-  // ✅ MODIFICA QUI: Inizializzazione pulita senza l'oggetto auth parziale che corrompeva il path
+  // 🚨 PULIZIA AUTOMATICA DELL'URL (Risolve spazi e slash finali nascosti)
+  supaUrl = supaUrl.trim(); // Rimuove eventuali spazi vuoti all'inizio o alla fine
+  if (supaUrl.endsWith('/')) {
+    supaUrl = supaUrl.slice(0, -1); // Rimuove lo slash finale se presente
+  }
+
+  // Inizializzazione con l'URL perfettamente pulito
   const supabase = createClient(supaUrl, serviceRole);
+
+  // ... (tutto il resto del tuo codice di fetch, dedup, ecc. rimane identico) ...
+
 
   // 1. Fetch parallelo da TUTTE le fonti
   const [rssResult, newsapi, guardian, gnews] = await Promise.all([
