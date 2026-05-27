@@ -1,6 +1,7 @@
 /**
  * lib/news/types.ts
  * Tipi condivisi tra RSS parser e integratori API esterne.
+ * Aggiornato con helper di mappatura nativi per PostgreSQL (Supabase).
  */
 import type { CategoryId } from '@/lib/rss/config';
 
@@ -32,7 +33,7 @@ export function stripHtml(input: string | undefined | null): string {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/'/g, "'")
     .replace(MULTI_SPACE, ' ')
     .trim();
 }
@@ -92,4 +93,46 @@ export function similarity(a: string, b: string): number {
     }
   }
   return 1 - ((dp[m] as number[])[n] as number) / Math.max(m, n);
+}
+
+/**
+ * Mappa un oggetto NewsItem (CamelCase) nel record SnakeCase richiesto dal database.
+ * Risolve definitivamente l'errore malformed array literal forzando un array di stringhe nativo.
+ */
+export function toDatabaseRow(item: NewsItem) {
+  return {
+    hash: item.hash,
+    source_id: item.sourceId,
+    source_name: item.sourceName,
+    title: item.title,
+    link: item.link,
+    description: item.description,
+    image_url: item.imageUrl,
+    lang: item.lang,
+    priority: item.priority,
+    published_at: item.publishedAt,
+    tags: Array.isArray(item.tags) ? item.tags : [], // Fix nativo array per PostgreSQL
+    category_id: item.categoryId
+  };
+}
+
+/**
+ * Converte una riga estratta dal database (SnakeCase) nell'interfaccia NewsItem (CamelCase)
+ * utilizzata dai componenti del frontend.
+ */
+export function toFrontendItem(row: any): NewsItem {
+  return {
+    hash: row.hash,
+    sourceId: row.source_id,
+    sourceName: row.source_name,
+    title: row.title,
+    link: row.link,
+    description: row.description,
+    imageUrl: row.image_url,
+    lang: row.lang,
+    priority: row.priority,
+    publishedAt: row.published_at,
+    tags: row.tags || [],
+    categoryId: row.category_id
+  };
 }
