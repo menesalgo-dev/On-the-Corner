@@ -1,11 +1,6 @@
 /**
  * server/sync/run-sync.ts
- * Pipeline completa di sync:
- *  1. Fetch RSS (21 fonti) in parallelo a NewsAPI/Guardian/GNews
- *  2. Dedup forte (hash + link + title + similarity)
- *  3. Bilanciamento lingua
- *  4. Upsert su Supabase con onConflict
- *  5. Cleanup notizie vecchie
+ * Pipeline completa di sync con isolamento origin.
  */
 import { createClient } from '@supabase/supabase-js';
 import { fetchAllRssNews } from '@/lib/rss/parser';
@@ -41,10 +36,6 @@ export interface SyncResult {
   error?: string;
 }
 
-/**
- * Dedup forte: 4 livelli sequenziali.
- * Mantiene la prima occorrenza (priority 1 = IT viene PRIMA di priority 2 = EN).
- */
 function deduplicate(items: NewsItem[]): NewsItem[] {
   const sorted = [...items].sort((a, b) =>
     a.priority - b.priority ||
@@ -122,9 +113,6 @@ function toRow(n: NewsItem): NewsRow {
   };
 }
 
-/**
- * Esegue il sync completo. Ritorna risultato strutturato.
- */
 export async function runSync(): Promise<SyncResult> {
   const t0 = Date.now();
 
@@ -146,8 +134,6 @@ export async function runSync(): Promise<SyncResult> {
     };
   }
 
-  // 🚨 ESTRAZIONE CHIRURGICA DEL DOMINIO BASE
-  // Rimuove "/rest/v1" o slash finali se inseriti per errore su Vercel
   let supaUrl = rawSupaUrl.trim();
   try {
     const urlObj = new URL(supaUrl);
@@ -158,21 +144,11 @@ export async function runSync(): Promise<SyncResult> {
 
   const supabase = createClient(supaUrl, serviceRole);
 
-  // 1. Fetch parallelo da TUTTE le fonti
   const [rssResult, newsapi, guardian, gnews] = await Promise.all([
     fetchAllRssNews(),
-    fetchNewsApi().catch((e) => {
-      console.warn('[sync] newsapi crashed:', (e as Error).message);
-      return [];
-    }),
-    fetchGuardian().catch((e) => {
-      console.warn('[sync] guardian crashed:', (e as Error).message);
-      return [];
-    }),
-    fetchGnews().catch((e) => {
-      console.warn('[sync] gnews crashed:', (e as Error).message);
-      return [];
-    }),
+    fetchNewsApi().catch(() => []),
+    fetchGuardian().catch(() => []),
+    fetchGnews().catch(() => []),
   ]);
 
   const fetched = {
@@ -184,21 +160,12 @@ export async function runSync(): Promise<SyncResult> {
   };
   fetched.total = fetched.rss + fetched.newsapi + fetched.guardian + fetched.gnews;
 
-  // 2. Merge + dedup
   const allItems = [...rssResult.items, ...newsapi, ...guardian, ...gnews];
   const deduped = deduplicate(allItems);
-
-  // 3. Bilanciamento lingua
   const balanced = balanceByLanguage(deduped, BALANCE_LANG_THRESHOLD_IT, BALANCE_LANG_EN_CAP_PCT);
 
-  // 4. Sort finale: priority → recency
-  balanced.sort(
-    (a, b) =>
-      a.priority - b.priority ||
-      Date.parse(b.publishedAt) - Date.parse(a.publishedAt),
-  );
+  balanced.sort((a, b) => a.priority - b.priority || Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 
-  // 5. Conta per categoria (statistica)
   const perCategory: Record<string, number> = {};
   const perSource = { ...rssResult.perSource };
   balanced.forEach((i) => {
@@ -207,7 +174,6 @@ export async function runSync(): Promise<SyncResult> {
     perSource[i.sourceId]! += 1;
   });
 
-  // 6. Upsert su Supabase a batch
   const rows = balanced.map(toRow);
   let upserted = 0;
   for (const batch of chunk(rows, 200)) {
@@ -232,8 +198,8 @@ export async function runSync(): Promise<SyncResult> {
     upserted += count ?? batch.length;
   }
 
-  // 7. Cleanup notizie troppo vecchie
-  const threshold = new Date(Date.now() - MAX_AGE_DAYS_IT * 86_400_000).toISOString();
+  // Estendiamo leggermente l'intervallo di cleanup per evitare cancellazioni immediate dovute al fuso orario
+  const threshold = new Date(Date.now() - (MAX_AGE_DAYS_IT + 2) * 86_400_000).toISOString();
   let deleted = 0;
   try {
     const { count } = await supabase
