@@ -1,20 +1,20 @@
 /**
  * components/layout/Header.tsx
- * Header sticky Premium Minimal - Struttura unificata e scalabile.
- * Allineato con la palette otc e predisposto per layout modulari futuri.
+ * Header sticky Premium Minimal - Allineato con la sezione Fantacalcio e l'Archivio.
  */
 import React from 'react';
 import Link from 'next/link';
-import { Search, Bookmark } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { createClient } from '@/lib/supabase/server';
 import { MobileMenu } from './MobileMenu';
 
-// 🛠️ NAV CORE ACCORCIATA: Le discipline sportive scalano sullo slider liquido di app/news/page
+// 🛠️ AGGIORNAMENTO NAV: Inserita la rotta Fantacalcio e rinominati i Segnalibri in Archivio
 const NAV_LINKS = [
   { href: '/news', label: 'Notizie' },
   { href: '/live', label: 'Live' },
-  { href: '/bookmarks', label: 'Segnalibri' }, // Modulo futuro agganciato nativamente all'architettura
+  { href: '/fantacalcio', label: 'Fantacalcio' },
+  { href: '/bookmarks', label: 'Archivio' }, 
 ];
 
 export async function Header() {
@@ -30,12 +30,10 @@ export async function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-otc-line bg-otc-bg/80 backdrop-blur-lg">
       <div className="mx-auto flex max-w-[1340px] items-center gap-3 px-5 py-2.5 sm:px-6">
-        {/* Logo Brand */}
         <Link href="/" className="shrink-0 transition-opacity hover:opacity-90">
           <Logo size={28} withWordmark />
         </Link>
 
-        {/* Navigazione Desktop - Pulita, spaziosa ed editoriale */}
         <nav className="ml-8 hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((link) => (
             <Link
@@ -50,7 +48,6 @@ export async function Header() {
 
         <div className="flex-1" />
 
-        {/* Cerca - Miniaturizzato e fuso con i token otc */}
         <Link
           href="/search"
           aria-label="Cerca"
@@ -59,7 +56,6 @@ export async function Header() {
           <Search className="h-3.5 w-3.5" />
         </Link>
 
-        {/* Area Autenticazione - Pulsantiera ridimensionata in formato Micro-Badge */}
         {userEmail ? (
           <Link
             href="/profile"
@@ -86,7 +82,6 @@ export async function Header() {
           </div>
         )}
 
-        {/* Mobile menu */}
         <MobileMenu navLinks={NAV_LINKS} isLoggedIn={!!userEmail} />
       </div>
     </header>
