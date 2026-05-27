@@ -1,10 +1,10 @@
 /**
  * app/live/page.tsx
- * Live Tracker Hub - Centrale Operativa Dinamica Multi-Sport.
- * Carica in tempo reale tutti gli eventi presenti nel DB dividendoli per disciplina.
+ * Live Tracker Hub - Versione Sofascore Compatta.
+ * Interamente connesso al flusso reale di Supabase con aggiornamenti dinamici.
  */
 import React from 'react';
-import { Radio, Activity, Trophy, Clock, Layers } from 'lucide-react';
+import { Radio, Activity, Clock, ChevronRight } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
@@ -13,20 +13,15 @@ import { fetchLatestNews, fetchUserBookmarkHashes, supabaseServer } from '@/lib/
 import { toNewsCardData } from '@/lib/news/types';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 30; // Aggiornamento rapido ogni 30 secondi per la massima reattività
-
-export const metadata = {
-  title: 'Diretta Risultati Universale — On The Corner Live',
-  description: 'Tutti gli eventi sportivi della giornata in tempo reale divisi per disciplina.',
-};
+export const revalidate = 15; // Cache brevissima di 15 secondi per simulare il tempo reale di Sofascore
 
 export default async function LivePage() {
-  // 1. RECUPERO IN PARALLELO: Tutti i match reali dal DB + Ultime news + Preferiti ad hash
+  // Recupero parallelo dal database di tutti i match reali del palinsesto odierno
   const [liveMatchesResult, rawNews, bookmarkHashes] = await Promise.all([
     supabaseServer
       .from('live_matches')
       .select('*')
-      .order('sport', { ascending: true })
+      .order('event_status', { ascending: true }) // Mette i match 'live' in cima
       .order('updated_at', { ascending: false }),
     fetchLatestNews({ limit: 4 }),
     fetchUserBookmarkHashes(),
@@ -35,133 +30,120 @@ export default async function LivePage() {
   const liveMatches = liveMatchesResult.data || [];
   const latestNews = (rawNews || []).map((row: any) => toNewsCardData(row));
 
-  // 2. RAGGRUPPAMENTO DINAMICO: Divide automaticamente i match per sport (Calcio, F1, Tennis, ecc.)
-  // Gestisce infiniti eventi e nuove discipline senza bisogno di modificare il codice in futuro
-  const matchesBySport: Record<string, any[]> = {};
+  // Raggruppamento automatico per Competizione/Lega (Esattamente come fa Sofascore)
+  const matchesByLeague: Record<string, any[]> = {};
   liveMatches.forEach((match) => {
-    const sportKey = match.sport ? match.sport.toLowerCase() : 'altri sport';
-    if (!matchesBySport[sportKey]) {
-      matchesBySport[sportKey] = [];
+    const leagueKey = match.league || 'Altri Eventi';
+    if (!matchesByLeague[leagueKey]) {
+      matchesByLeague[leagueKey] = [];
     }
-    matchesBySport[sportKey].push(match);
+    matchesByLeague[leagueKey].push(match);
   });
 
   return (
     <div className="min-h-screen bg-otc-bg text-zinc-100 selection:bg-otc-accent/10 selection:text-otc-accent-2">
       <Header />
 
-      <main className="mx-auto max-w-[1340px] px-6 py-8 md:py-12">
+      <main className="mx-auto max-w-[1200px] px-5 py-8 md:py-10">
         
-        {/* Intestazione della Centrale Operativa */}
-        <header className="flex flex-col md:flex-row md:items-end md:justify-between mb-8 pb-5 border-b border-otc-line">
+        {/* Intestazione Sofascore Tracker */}
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 pb-4 border-b border-otc-line">
           <div>
-            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse-dot" />
-              Flusso Streaming live Attivo
-            </div>
             <h1 
-              className="text-xl font-bold uppercase tracking-widest text-zinc-200 font-mono"
+              className="text-lg font-bold uppercase tracking-widest text-zinc-250 font-mono flex items-center gap-2"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              Tutti gli Eventi<span className="text-otc-accent">.</span>
+              <span className="inline-flex h-2 w-2 rounded-full bg-red-500 animate-pulse-dot" />
+              Diretta Risultati<span className="text-otc-accent">.</span>
             </h1>
-            <p className="text-xs text-zinc-500 mt-1 max-w-xl leading-relaxed">
-              Tabellone universale dei punteggi. I dati si aggiornano da soli includendo ogni match della giornata.
-            </p>
+            <p className="text-xs text-zinc-500 mt-1">Palinsesto sportivo globale aggiornato al minuto.</p>
           </div>
-
-          <div className="text-[10px] font-mono tracking-wider text-zinc-400 uppercase mt-3 md:mt-0 bg-otc-surface border border-otc-line px-2.5 py-1 rounded-md">
-            {liveMatches.length} Eventi Attivi
+          <div className="text-[10px] font-mono tracking-wider text-zinc-400 uppercase mt-2 sm:mt-0 bg-otc-surface border border-otc-line px-2.5 py-1 rounded">
+            {liveMatches.length} Match in tabellone
           </div>
         </header>
 
-        {/* 🛠️ CONDIZIONE 1: SE IL DATABASE È VUOTO (Placeholder Premium Informativo) */}
+        {/* 🛠️ CASO VUOTO: Se non ci sono partite registrate nella giornata */}
         {liveMatches.length === 0 ? (
-          <section className="mb-12 overflow-hidden rounded-xl border border-otc-line bg-gradient-to-br from-otc-surface to-[#120f03]/20 p-6 md:p-8">
-            <div className="flex items-start gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-500 animate-pulse-dot">
-                <Radio className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-200" style={{ fontFamily: 'var(--font-display)' }}>
-                  Nessun evento in corso in questo momento
-                </h3>
-                <p className="mt-2 max-w-3xl text-xs text-zinc-400 leading-relaxed font-normal">
-                  Il tabellone è vuoto perché non ci sono partite o sessioni attive sul palinsesto attuale. Lo scraper automatico è connesso agli endpoint stabili di <span className="text-zinc-300 font-medium">Football-Data.org</span> e <span className="text-zinc-300 font-medium">Jolpica API</span>: non appena inizieranno i primi match della giornata, i punteggi e i minuti di gioco appariranno qui automaticamente divisi per categoria.
-                </p>
-              </div>
-            </div>
-          </section>
+          <div className="rounded-xl border border-otc-line bg-otc-surface p-8 text-center max-w-xl mx-auto my-12">
+            <Radio className="h-6 w-6 text-zinc-600 mx-auto mb-3 animate-pulse-dot" />
+            <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Nessun match in corso</h3>
+            <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
+              Nessun evento attivo registrato su Supabase. Richiama l&apos;URL di sincronizzazione per caricare le partite odierne di Football-Data.
+            </p>
+          </div>
         ) : (
-          /* 🛠️ CONDIZIONE 2: STAMPA AUTOMATICA DI TUTTI GLI EVENTI DIVISI PER SPORT */
-          <div className="space-y-10 mb-12">
-            {Object.entries(matchesBySport).map(([sportName, items]) => (
-              <section key={sportName} className="animate-fadeIn">
-                {/* Intestazione Dinamica dello Sport */}
-                <div className="flex items-center gap-2 mb-4 border-b border-zinc-900 pb-2">
-                  <span className="text-xs font-mono uppercase tracking-widest text-zinc-400 font-bold capitalize">
-                    📊 {sportName} ({items.length})
-                  </span>
+          /* 🛠️ CASO POPOLATO: Struttura a Blocchi di Lega in stile Sofascore */
+          <div className="space-y-6 mb-12">
+            {Object.entries(matchesByLeague).map(([leagueName, items]) => (
+              <div key={leagueName} className="rounded-xl border border-otc-line bg-[#070709] overflow-hidden">
+                
+                {/* Intestazione della Competizione */}
+                <div className="bg-otc-surface px-4 py-2 border-b border-otc-line text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-bold flex justify-between items-center">
+                  <span>🏆 {leagueName}</span>
+                  <span className="text-[9px] text-zinc-600 font-normal">{items[0]?.sport}</span>
                 </div>
 
-                {/* Griglia Liquida dei Match dello sport corrente */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {items.map((match) => (
-                    <div 
-                      key={match.id} 
-                      className="group rounded-xl border border-otc-line bg-otc-surface p-4 transition duration-200 hover:border-zinc-700/60"
-                    >
-                      <div className="flex justify-between text-[9px] font-mono uppercase tracking-wider text-zinc-500 mb-3">
-                        <span>{match.league || 'Competizione'}</span>
-                        <span className="text-red-400 font-bold inline-flex items-center gap-1 animate-pulse-dot">
-                          <Activity className="h-3 w-3" /> {match.match_minute || 'Live'}&apos;
-                        </span>
-                      </div>
-                      
-                      {/* Scoreboard Flessibile (Funziona sia per Calcio che per Tennis/Motori) */}
-                      <div className="space-y-2 my-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-semibold text-zinc-300 group-hover:text-white transition-colors">
-                            {match.home_team}
-                          </span>
-                          <span className="font-mono text-xs font-bold bg-otc-line px-2 py-0.5 rounded border border-zinc-800/40">
-                            {match.home_score}
-                          </span>
+                {/* Lista dei match all&apos;interno della competizione */}
+                <div className="divide-y divide-otc-line/40">
+                  {items.map((match) => {
+                    const isLive = match.event_status === 'live';
+                    const isFinished = match.event_status === 'finished';
+
+                    return (
+                      <div key={match.id} className="group p-4 flex items-center gap-4 bg-otc-bg transition hover:bg-otc-surface/20">
+                        
+                        {/* Indicatore Temporale / Minuto Sofascore */}
+                        <div className="w-14 shrink-0 text-center flex flex-col items-center justify-center font-mono">
+                          {isLive ? (
+                            <span className="text-[10px] font-bold text-red-400 inline-flex items-center gap-0.5 animate-pulse-dot">
+                              <Activity className="h-3 w-3" />
+                              {match.match_minute}&apos;
+                            </span>
+                          ) : isFinished ? (
+                            <span className="text-[9px] text-zinc-600 uppercase font-semibold">Fin</span>
+                          ) : (
+                            <span className="text-[10px] text-otc-accent font-bold inline-flex items-center gap-0.5">
+                              <Clock className="h-3 w-3" />
+                              {match.match_minute}
+                            </span>
+                          )}
                         </div>
-                        {match.away_team && (
+
+                        {/* Nomi delle Squadre (Incolonnate) */}
+                        <div className="flex-1 space-y-1.5 border-l border-otc-line/60 pl-4">
                           <div className="flex justify-between items-center">
-                            <span className="text-sm font-semibold text-zinc-300 group-hover:text-white transition-colors">
+                            <span className={`text-xs tracking-tight ${isFinished && Number(match.home_score) < Number(match.away_score) ? 'text-zinc-500' : 'text-zinc-200 group-hover:text-white'}`}>
+                              {match.home_team}
+                            </span>
+                            <span className={`font-mono text-xs font-bold px-1.5 py-0.5 rounded ${isLive ? 'text-red-400 bg-red-500/5' : 'text-zinc-300'}`}>
+                              {match.home_score}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className={`text-xs tracking-tight ${isFinished && Number(match.away_score) < Number(match.home_score) ? 'text-zinc-500' : 'text-zinc-200 group-hover:text-white'}`}>
                               {match.away_team}
                             </span>
-                            <span className="font-mono text-xs font-bold bg-otc-line px-2 py-0.5 rounded border border-zinc-800/40">
+                            <span className={`font-mono text-xs font-bold px-1.5 py-0.5 rounded ${isLive ? 'text-red-400 bg-red-500/5' : 'text-zinc-300'}`}>
                               {match.away_score}
                             </span>
                           </div>
-                        )}
-                      </div>
+                        </div>
 
-                      {/* Dettagli Marcatore o Telemetria estratti dal JSON */}
-                      {match.live_details && (
-                        <p className="text-[10px] text-zinc-500 font-mono mt-3 border-t border-zinc-900/50 pt-2">
-                          {match.live_details}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                        {/* Azione di espansione (Freccia a destra discreta) */}
+                        <ChevronRight className="h-3.5 w-3.5 text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity ml-2" />
+                      </div>
+                    );
+                  })}
                 </div>
-              </section>
+              </div>
             ))}
           </div>
         )}
 
-        {/* GRIGLIA NEWS SPORTIVE CORRELATE INFERIORI */}
+        {/* FEED NEWS INFERIORE */}
         <section className="border-t border-zinc-900 pt-8">
-          <h2 
-            className="mb-5 text-sm font-mono uppercase tracking-widest text-zinc-400"
-            style={{ fontFamily: 'var(--font-mono)' }}
-          >
-            // Analisi e Report dell&apos;Ultim&apos;Ora
-          </h2>
+          <h2 className="mb-5 text-[10px] font-mono uppercase tracking-widest text-zinc-500">// Report e Approfondimenti Recenti</h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {latestNews.map((item) => (
               <NewsCard key={item.id} news={item} isBookmarked={bookmarkHashes.has(item.id)} />
