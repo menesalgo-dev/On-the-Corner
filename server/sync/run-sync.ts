@@ -128,9 +128,9 @@ function toRow(n: NewsItem): NewsRow {
 export async function runSync(): Promise<SyncResult> {
   const t0 = Date.now();
 
-  let supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const rawSupaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supaUrl || !serviceRole) {
+  if (!rawSupaUrl || !serviceRole) {
     return {
       ok: false,
       elapsed_ms: 0,
@@ -146,10 +146,14 @@ export async function runSync(): Promise<SyncResult> {
     };
   }
 
-  // Pulizia automatica dell'URL
-  supaUrl = supaUrl.trim();
-  if (supaUrl.endsWith('/')) {
-    supaUrl = supaUrl.slice(0, -1);
+  // 🚨 ESTRAZIONE CHIRURGICA DEL DOMINIO BASE
+  // Rimuove "/rest/v1" o slash finali se inseriti per errore su Vercel
+  let supaUrl = rawSupaUrl.trim();
+  try {
+    const urlObj = new URL(supaUrl);
+    supaUrl = urlObj.origin; 
+  } catch {
+    if (supaUrl.endsWith('/')) supaUrl = supaUrl.slice(0, -1);
   }
 
   const supabase = createClient(supaUrl, serviceRole);
