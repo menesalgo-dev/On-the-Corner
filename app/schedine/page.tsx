@@ -28,7 +28,14 @@ export default async function SchedinePage() {
     const supabaseAuth = await createClient();
     const { data: authData } = await supabaseAuth.auth.getUser();
     userId = authData.user?.id ?? null;
-
+// Da inserire dentro export default async function SchedinePage() prima di estrarre i dati:
+try {
+  // ⚡ INNESCO PULIZIA MEMORIA GRATUITA SUPABASE
+  // Esegue la funzione Postgres che cancella i record finiti/persi da più di un'ora
+  await supabaseServer.rpc('clean_expired_user_bets');
+} catch (cleanErr) {
+  console.error("⚠️ Errore durante la pulizia automatica dei record scaduti:", cleanErr);
+}
     if (userId) {
       // Estrae le schedine dell'utente includendo le singole selezioni e i dati dei match reali
       const { data } = await supabaseServer
