@@ -1,14 +1,13 @@
 /**
  * app/news/page.tsx
- * Feed completo delle notizie sportive.
+ * Feed completo delle notizie sportive con barra dei filtri integrata.
  * Allineato con esportazioni tipizzate e logica basata sull'hash.
  */
 import React from 'react';
+import Link from 'next/link';
 import { getNewsItems, fetchUserBookmarkHashes } from '@/lib/news';
 import { toNewsCardData } from '@/lib/news/types';
 import { NewsCard } from '@/components/news/NewsCard';
-
-// CORREZIONE IMPORT: Utilizzo dell'esportazione denominata { EmptyState }
 import { EmptyState } from '@/components/shared/EmptyState';
 
 // Forza la rigenerazione dinamica in tempo reale a ogni visita eliminando il vuoto statico
@@ -46,12 +45,21 @@ export default async function NewsPage({ searchParams }: PageProps) {
   // Conversione nei record strutturati attesi da NewsCard
   const formattedNews = (rawNews || []).map((row: any) => toNewsCardData(row));
 
+  // Lista delle categorie per la generazione dinamica della barra dei filtri
+  const categories = [
+    { id: 'tutto', label: 'Tutto' },
+    { id: 'calcio', label: 'Calcio ⚽' },
+    { id: 'f1', label: 'Formula 1 🏎️' },
+    { id: 'tennis', label: 'Tennis 🎾' },
+    { id: 'motogp', label: 'MotoGP 🏍️' },
+  ];
+
   return (
     <div className="min-h-screen bg-[#080808] text-white">
       <main className="mx-auto max-w-[1400px] p-6 md:p-10">
         
         {/* Header Sezione con Titolo e Contatore Dinamico */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 border-b border-zinc-800 pb-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 border-b border-zinc-800 pb-4">
           <div>
             <h1 
               className="text-3xl font-black uppercase tracking-tight text-[#e8c800]"
@@ -71,12 +79,33 @@ export default async function NewsPage({ searchParams }: PageProps) {
           </div>
         </div>
 
+        {/* Barra dei Filtri Sportivi (Tab di Navigazione) */}
+        <nav className="mb-8 flex flex-wrap gap-2 border-b border-zinc-900 pb-4">
+          {categories.map((cat) => {
+            const isActive = currentCategory.toLowerCase() === cat.id;
+            return (
+              <Link
+                key={cat.id}
+                href={`/news?category=${cat.id}${currentSource !== 'tutte fonti' ? `&source=${currentSource}` : ''}`}
+                className={`rounded-xl px-4 py-2 text-xs uppercase tracking-wider font-bold transition-all ${
+                  isActive
+                    ? 'bg-[#e8c800] text-black shadow-[0_4px_20px_rgba(232,200,0,0.2)]'
+                    : 'bg-[#0d0d0d] border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                }`}
+                style={{ fontFamily: 'var(--font-archivo-black)' }}
+              >
+                {cat.label}
+              </Link>
+            );
+          })}
+        </nav>
+
         {/* Griglia Notizie o Empty State */}
         {formattedNews.length === 0 ? (
           <div className="mt-12 flex justify-center">
             <EmptyState 
               title="Nessuna Notizia" 
-              description="Nessun risultato trovato nel database per i filtri selezionati."
+              description={`Nessun risultato trovato nel database per la categoria "${currentCategory}".`}
             />
           </div>
         ) : (
