@@ -1,13 +1,15 @@
 /**
  * app/news/page.tsx
- * Feed completo delle notizie sportive senza importazioni fantasma.
- * Interamente allineato alle funzioni stabili basate sull'hash logico.
+ * Feed completo delle notizie sportive.
+ * Allineato con esportazioni tipizzate e logica basata sull'hash.
  */
 import React from 'react';
 import { getNewsItems, fetchUserBookmarkHashes } from '@/lib/news';
 import { toNewsCardData } from '@/lib/news/types';
 import { NewsCard } from '@/components/news/NewsCard';
-import EmptyState from '@/components/shared/EmptyState';
+
+// CORREZIONE IMPORT: Utilizzo dell'esportazione denominata { EmptyState }
+import { EmptyState } from '@/components/shared/EmptyState';
 
 // Forza la rigenerazione dinamica in tempo reale a ogni visita eliminando il vuoto statico
 export const dynamic = 'force-dynamic';
@@ -22,7 +24,6 @@ interface PageProps {
 }
 
 export default async function NewsPage({ searchParams }: PageProps) {
-  // Risoluzione asincrona dei parametri di ricerca come richiesto da Next.js 15
   const resolvedParams = await searchParams;
   const currentCategory = resolvedParams.category || 'tutto';
   const currentSource = resolvedParams.source || 'tutte fonti';
@@ -42,7 +43,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
 
   const { news: rawNews, count: totalCount } = newsData;
 
-  // Conversione pulita dei record PostgreSQL in oggetti NewsCardData (SnakeCase)
+  // Conversione nei record strutturati attesi da NewsCard
   const formattedNews = (rawNews || []).map((row: any) => toNewsCardData(row));
 
   return (
@@ -70,7 +71,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        {/* Griglia Notizie o Empty State Originario */}
+        {/* Griglia Notizie o Empty State */}
         {formattedNews.length === 0 ? (
           <div className="mt-12 flex justify-center">
             <EmptyState 
