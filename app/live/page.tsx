@@ -1,14 +1,16 @@
 /**
  * app/live/page.tsx
  * Pagina match live. Placeholder per W4 (API sport).
- * Per ora mostra messaggio "in arrivo" + 6 ultime news sportive.
+ * Mostra messaggio "in arrivo" + 6 ultime news sportive completamente allineate.
  */
+import React from 'react';
 import { Radio } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { NewsCard } from '@/components/news/NewsCard';
-import { fetchLatestNews, fetchUserBookmarkIds } from '@/lib/news';
+import { fetchLatestNews, fetchUserBookmarkHashes } from '@/lib/news';
+import { toFrontendItem } from '@/lib/news/types';
 
 export const revalidate = 120;
 
@@ -18,19 +20,23 @@ export const metadata = {
 };
 
 export default async function LivePage() {
-  const [news, bookmarks] = await Promise.all([
+  // Recupero parallelo basato sulla logica logica dell'hash univoco
+  const [rawNews, bookmarkHashes] = await Promise.all([
     fetchLatestNews({ limit: 6 }),
-    fetchUserBookmarkIds(),
+    fetchUserBookmarkHashes(),
   ]);
+
+  // Normalizzazione immediata dei record del database in oggetti CamelCase tipizzati
+  const latestNews = (rawNews || []).map((row: any) => toFrontendItem(row));
 
   return (
     <>
       <Header />
 
-      <main className="mx-auto max-w-[1320px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12">
+      <main className="mx-auto max-w-[1320px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12 bg-[#080808]">
         <header className="mb-6">
           <h1
-            className="text-2xl uppercase tracking-tight sm:text-4xl"
+            className="text-2xl uppercase tracking-tight sm:text-4xl text-white font-black"
             style={{ fontFamily: 'var(--font-archivo-black)' }}
           >
             Live<span className="text-[#e8c800]">.</span>
@@ -51,22 +57,22 @@ export default async function LivePage() {
             </div>
             <div>
               <h2
-                className="text-xl uppercase tracking-tight text-white sm:text-2xl"
+                className="text-xl uppercase tracking-tight text-white sm:text-2xl font-black"
                 style={{ fontFamily: 'var(--font-archivo-black)' }}
               >
                 Match live in arrivo
               </h2>
-              <p className="mt-2 max-w-2xl text-sm text-zinc-400 sm:text-base">
+              <p className="mt-2 max-w-2xl text-sm text-zinc-400 sm:text-base leading-relaxed">
                 Stiamo integrando le API gratuite per i match live:
                 Football-Data.org per il calcio, Jolpica per F1, ATP/WTA per il tennis,
                 MotoGP API per le moto. Tra pochi giorni qui vedrai punteggi live,
-                marcatori, eventi, classifiche e statistiche aggiornate al minuto.
+                marcatori, events, classifiche e statistiche aggiornate al minuto.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {['⚽ Serie A', '🏎️ F1', '🎾 ATP', '🏍️ MotoGP', '🏆 Champions', '🏈 NFL'].map((s) => (
                   <span
                     key={s}
-                    className="rounded-full border border-[#1f1f1f] bg-[#141414] px-3 py-1 text-xs text-zinc-300"
+                    className="rounded-full border border-[#1f1f1f] bg-[#141414] px-3 py-1 text-xs text-zinc-300 font-medium"
                   >
                     {s}
                   </span>
@@ -79,14 +85,18 @@ export default async function LivePage() {
         {/* Ultime news sportive */}
         <section>
           <h2
-            className="mb-4 text-base uppercase tracking-tight sm:text-xl"
+            className="mb-4 text-base uppercase tracking-tight text-white sm:text-xl font-black"
             style={{ fontFamily: 'var(--font-archivo-black)' }}
           >
             Ultime <span className="text-[#e8c800]">News</span>
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {news.map((item) => (
-              <NewsCard key={item.id} news={item} isBookmarked={bookmarks.has(item.id)} />
+            {latestNews.map((item) => (
+              <NewsCard 
+                key={item.hash} 
+                news={item} 
+                isBookmarked={bookmarkHashes.has(item.hash)} 
+              />
             ))}
           </div>
         </section>
