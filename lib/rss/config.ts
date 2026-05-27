@@ -1,20 +1,13 @@
 /**
- * lib/rss/config.ts — versione W3.
- * Aggiunte: 2 fonti (GPone MotoGP, NFL.com), campo opzionale `forceCat`.
- * Esporta CategoryId, MAX_AGE_DAYS_IT/EN, BALANCE_LANG_*.
+ * lib/rss/config.ts
+ * Le 21 fonti RSS di On The Corner.
+ * Identiche al sito vecchio + 2 nuove (GPone, NFL.com).
  */
 
 export type FeedLang = 'it' | 'en';
 
-/** Id delle categorie OTC. Allineato con tabella `categories`. */
 export type CategoryId =
-  | 'calcio'
-  | 'champions'
-  | 'f1'
-  | 'motogp'
-  | 'tennis'
-  | 'nfl'
-  | 'altro';
+  | 'calcio' | 'champions' | 'f1' | 'motogp' | 'tennis' | 'nfl' | 'altro';
 
 export interface FeedSource {
   id: string;
@@ -22,13 +15,11 @@ export interface FeedSource {
   url: string;
   lang: FeedLang;
   priority: 1 | 2;
-  /** Se presente, tutte le notizie del feed ottengono questa categoria
-   *  bypassando il sistema a keyword. */
   forceCat?: CategoryId;
 }
 
 export const FEEDS: readonly FeedSource[] = [
-  // ─── Italiane (priorità 1) ───
+  // Italiane (priorità 1)
   { id: 'g',           name: 'Gazzetta',           url: 'https://www.gazzetta.it/rss/home.xml',                                lang: 'it', priority: 1 },
   { id: 'c',           name: 'Corriere Sport',     url: 'https://www.corrieredellosport.it/rss/home.xml',                      lang: 'it', priority: 1 },
   { id: 's',           name: 'Sky Sport',          url: 'https://sport.sky.it/rss/sport.xml',                                  lang: 'it', priority: 1 },
@@ -43,7 +34,7 @@ export const FEEDS: readonly FeedSource[] = [
   { id: 'fp',          name: 'FormulaPassion',     url: 'https://www.formulapassion.it/feed',                                  lang: 'it', priority: 1, forceCat: 'f1' },
   { id: 'gpone',       name: 'GPone',              url: 'https://www.gpone.com/it/rss.xml',                                    lang: 'it', priority: 1, forceCat: 'motogp' },
 
-  // ─── Estere (priorità 2) ───
+  // Estere (priorità 2)
   { id: 'b',     name: 'BBC Sport',     url: 'https://feeds.bbci.co.uk/sport/rss.xml',                                          lang: 'en', priority: 2 },
   { id: 'f',     name: 'Formula1.com',  url: 'https://www.formula1.com/content/fom-website/en/latest/all.xml',                  lang: 'en', priority: 2, forceCat: 'f1' },
   { id: 'marca', name: 'Marca',         url: 'https://e00-marca.uecdn.es/rss/portada.xml',                                      lang: 'en', priority: 2 },
@@ -54,14 +45,11 @@ export const FEEDS: readonly FeedSource[] = [
   { id: 'nfl',   name: 'NFL.com',       url: 'https://www.nfl.com/feeds/rss/news',                                              lang: 'en', priority: 2, forceCat: 'nfl' },
 ] as const;
 
-// ───── Costanti operative ─────
 export const MAX_ITEMS_PER_SOURCE = 10;
-export const MAX_AGE_DAYS_IT      = 7;
-export const MAX_AGE_DAYS_EN      = 3;
-
+export const MAX_AGE_DAYS_IT = 7;
+export const MAX_AGE_DAYS_EN = 3;
 export const FETCH_TIMEOUT_MS = 8_000;
 export const RSS_USER_AGENT = 'OnTheCornerBot/1.0 (+https://onthecorner.it)';
 export const DEDUP_TITLE_SIM_THRESHOLD = 0.85;
-
 export const BALANCE_LANG_THRESHOLD_IT = 30;
 export const BALANCE_LANG_EN_CAP_PCT = 20;
