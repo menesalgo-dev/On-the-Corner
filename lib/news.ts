@@ -1,214 +1,75 @@
-/**
- * lib/news.ts
- * Funzioni di lettura news dal DB con privilegi di servizio.
- */
-import 'server-only';
 import { createClient } from '@supabase/supabase-js';
-import type { NewsCardData } from '@/components/news/NewsCard';
 
-interface AnyRow {
-  id: unknown;
-  hash?: unknown;
-  title: unknown;
-  link: unknown;
-  description: unknown;
-  image_url: unknown;
-  source_name: unknown;
-  published_at: unknown;
-  category_id?: unknown;
-  category_name?: unknown;
-  category_emoji?: unknown;
+// Estrazione dell'origine pulita per evitare corruzioni di percorso HTTP (PGRST125)
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supaUrl = rawUrl ? new URL(rawUrl).origin : '';
+const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+if (!supaUrl || !supaKey) {
+  throw new Error("Variabili d'ambiente Supabase mancanti nel contesto Server.");
 }
 
-function toCard(r: AnyRow): NewsCardData {
-  const finalId = r.hash ? String(r.hash) : (r.id ? String(r.id) : '');
-
-  return {
-    id: finalId,
-    title: String(r.title ?? ''),
-    link: String(r.link ?? ''),
-    description: r.description ? String(r.description) : null,
-    image_url: r.image_url ? String(r.image_url) : null,
-    source_name: String(r.source_name ?? ''),
-    published_at: String(r.published_at ?? ''),
-    category_id: r.category_id ? String(r.category_id) : null,
-    category_name: r.category_id ? String(r.category_id).toUpperCase() : 'ALTRO',
-    category_emoji: '📰',
-  };
-}
-
-/** Ultime N notizie filtrate per categoria direttamente dalla tabella */
-export async function fetchLatestNews(opts: { limit?: number; categoryId?: string } = {}): Promise<NewsCardData[]> {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  
-  try {
-    let q = supabase
-      .from('news_items')
-      .select('id, hash, title, link, description, image_url, source_name, published_at, category_id')
-      .order('published_at', { ascending: false })
-      .limit(opts.limit ?? 30);
-      
-    if (opts.categoryId && opts.categoryId !== 'tutto') {
-      q = q.eq('category_id', opts.categoryId.toLowerCase().trim());
-    }
-    
-    const { data, error } = await q;
-    if (error) return [];
-    return ((data ?? []) as AnyRow[]).map(toCard);
-  } catch {
-    return [];
+// Client inizializzato con Service Role per bypassare blocchi RLS lato server
+export const supabaseServer = createClient(supaUrl, supaKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false
   }
-}
+});
 
-/** Paginazione cursor-based con filtri diretti */
-export async function fetchNewsPage(opts: {
+export interface FetchNewsParams {
+  category?: string;
+  source?: string;
+  page?: number;
   limit?: number;
-  before?: string | null;
-  sourceId?: string;
-  categoryId?: string;
-}): Promise<NewsCardData[]> {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+}
+
+export async function getNewsItems({ category, source, page = 1, limit = 20 }: FetchNewsParams = {}) {
   try {
-    let q = supabase
+    let queryBuilder = supabaseServer
       .from('news_items')
-      .select('id, hash, title, link, description, image_url, source_name, published_at, category_id')
-      .order('published_at', { ascending: false })
-      .limit(opts.limit ?? 20);
-    if (opts.before) q = q.lt('published_at', opts.before);
-    if (opts.sourceId) q = q.eq('source_id', opts.sourceId);
-    if (opts.categoryId && opts.categoryId !== 'tutto') q = q.eq('category_id', opts.categoryId.toLowerCase().trim());
-    
-    const { data, error } = await q;
-    if (!error && data) return (data as AnyRow[]).map(toCard);
-  } catch {}
-  return [];
-}
+      .select('*', { count: 'exact' });
 
-/** Ricerca full-text */
-export async function searchNews(query: string, limit = 30): Promise<NewsCardData[]> {
-  if (!query.trim()) return [];
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data } = await supabase
-    .from('news_items')
-    .select('id, hash, title, link, description, image_url, source_name, published_at')
-    .ilike('title', `%${query}%`)
-    .order('published_at', { ascending: false })
-    .limit(limit);
-  return ((data ?? []) as AnyRow[]).map(toCard);
-}
+    // 1. GESTIONE KILLER FILTRO CATEGORIA (Evita il match letterale di "tutto")
+    if (category && category.toLowerCase() !== 'tutto' && category.toLowerCase() !== 'all') {
+      // Dizionario di mappatura se la colonna category_id sul DB è un intero
+      const categoryMapping: Record<string, number> = {
+        'calcio': 1,
+        'f1': 2,
+        'tennis': 3,
+        'motogp': 4
+      };
 
-/** Notizia per id/hash */
-export async function fetchNewsById(id: string): Promise<NewsCardData | null> {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data } = await supabase
-    .from('news_items')
-    .select('id, hash, title, link, description, image_url, source_name, published_at, category_id')
-    .eq('hash', id)
-    .maybeSingle();
-  return data ? toCard(data as AnyRow) : null;
-}
-
-/** Bookmarks dell'utente corrente */
-export async function fetchUserBookmarkIds(): Promise<Set<string>> {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return new Set();
-
-    const { data } = await supabase
-      .from('news_bookmarks')
-      .select('news_id')
-      .eq('user_id', user.id);
-    return new Set(((data ?? []) as { news_id: unknown }[]).map((r) => String(r.news_id)));
-  } catch {
-    return new Set();
-  }
-}
-
-/** Ticker items (14 più recenti) */
-export async function fetchTickerItems(): Promise<
-  { id: string; title: string; link: string; source_name: string }[]
-> {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data } = await supabase
-    .from('news_items')
-    .select('id, hash, title, link, source_name')
-    .order('published_at', { ascending: false })
-    .limit(14);
-  return ((data ?? []) as AnyRow[]).map((r) => ({
-    id: r.hash ? String(r.hash) : (r.id ? String(r.id) : ''),
-    title: String(r.title ?? ''),
-    link: String(r.link ?? ''),
-    source_name: String(r.source_name ?? ''),
-  }));
-}
-
-/** Stat per sidebar: totali + per fonte */
-export async function fetchNewsStats(): Promise<{
-  total: number;
-  sources: { id: string; name: string; count: number }[];
-}> {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { count } = await supabase
-    .from('news_items')
-    .select('*', { count: 'exact', head: true });
-  const { data: bySource } = await supabase
-    .from('news_items')
-    .select('source_id, source_name')
-    .limit(1000);
-
-  const sources = new Map<string, { name: string; count: number }>();
-  (bySource ?? []).forEach((r: { source_id: unknown; source_name: unknown }) => {
-    const key = String(r.source_id ?? '');
-    if (!key) return;
-    const e = sources.get(key) ?? { name: String(r.source_name ?? ''), count: 0 };
-    e.count += 1;
-    sources.set(key, e);
-  });
-  return {
-    total: count ?? 0,
-    sources: Array.from(sources, ([id, v]) => ({ id, ...v })).sort((a, b) => b.count - a.count),
-  };
-}
-
-/** Conteggi reali raggruppati per categoria dal database */
-export async function fetchCategoryCounts(): Promise<Map<string, number>> {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  try {
-    const { data } = await supabase.from('news_items').select('category_id');
-    const m = new Map<string, number>();
-    
-    // Inizializza a 0 i contatori principali per evitare undefined sulla mappa
-    m.set('tutto', 0);
-    m.set('calcio', 0);
-    m.set('f1', 0);
-    m.set('tennis', 0);
-    m.set('motogp', 0);
-
-    let totale = 0;
-    (data ?? []).forEach((r: { category_id: unknown }) => {
-      if (r.category_id) {
-        const key = String(r.category_id).toLowerCase().trim();
-        m.set(key, (m.get(key) ?? 0) + 1);
-        totale++;
+      const mappedId = categoryMapping[category.toLowerCase()];
+      if (mappedId !== undefined) {
+        queryBuilder = queryBuilder.eq('category_id', mappedId);
+      } else {
+        // Fallback se la colonna accetta direttamente stringhe minuscole
+        queryBuilder = queryBuilder.eq('category_id', category.toLowerCase());
       }
-    });
-    m.set('tutto', totale);
-    return m;
-  } catch {
-    return new Map();
-  }
-}
+    }
 
-/** Configurazione fissa delle categorie allineata alle chiavi del DB */
-export async function fetchCategories(): Promise<
-  { id: string; name: string; short_name: string | null; emoji: string | null; sort_order: number }[]
-> {
-  return [
-    { id: 'tutto', name: 'Tutto', short_name: 'Tutto', emoji: '📰', sort_order: 1 },
-    { id: 'calcio', name: 'Calcio', short_name: 'Calcio', emoji: '⚽', sort_order: 2 },
-    { id: 'f1', name: 'F1', short_name: 'F1', emoji: '🏎️', sort_order: 3 },
-    { id: 'tennis', name: 'Tennis', short_name: 'Tennis', emoji: '🎾', sort_order: 4 },
-    { id: 'motogp', name: 'MotoGP', short_name: 'MotoGP', emoji: '🏍️', sort_order: 5 }
-  ];
+    // 2. GESTIONE KILLER FILTRO FONTE (Evita il match letterale di "tutte fonti")
+    if (source && source.toLowerCase() !== 'tutte fonti' && source.toLowerCase() !== 'all') {
+      queryBuilder = queryBuilder.eq('source', source);
+    }
+
+    // Pagaginazione e ordinamento temporale decrescente (recency)
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    const { data, count, error } = await queryBuilder
+      .order('published_at', { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+
+    return {
+      news: data || [],
+      count: count || 0
+    };
+  } catch (err: any) {
+    console.error("❌ Errore critico in getNewsItems:", err.message);
+    return { news: [], count: 0 };
+  }
 }
