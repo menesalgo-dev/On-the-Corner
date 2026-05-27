@@ -63,6 +63,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
     { id: 'f1', label: 'Formula 1' },
     { id: 'tennis', label: 'Tennis' },
     { id: 'motogp', label: 'MotoGP' },
+    { id: 'fantacalcio', label: 'Fantacalcio' },
   ];
 
   return (
