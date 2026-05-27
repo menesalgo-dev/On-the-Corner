@@ -1,6 +1,7 @@
 /**
  * components/news/NewsCard.tsx
  * Card notizia con 3 varianti: hero, default, compact.
+ * Allineato con la proprietà delle Props di BookmarkButton.
  */
 import Link from 'next/link';
 import Image from 'next/image';
@@ -95,7 +96,8 @@ function HeroVariant({ news, isBookmarked }: InternalProps) {
         </div>
       </Link>
       <div className="absolute right-4 top-4 z-10">
-        <BookmarkButton newsId={news.id} initialBookmarked={isBookmarked} variant="floating" />
+        {/* FIX LINEA 98: Sostituito newsId={news.id} con newsHash={news.id} */}
+        <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
       </div>
     </article>
   );
@@ -156,7 +158,8 @@ function DefaultVariant({ news, isBookmarked }: InternalProps) {
         ) : (
           <span />
         )}
-        <BookmarkButton newsId={news.id} initialBookmarked={isBookmarked} />
+        {/* FIX RIGHE SUCCESSIVE: Sostituito newsId={news.id} con newsHash={news.id} */}
+        <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
       </div>
     </article>
   );
@@ -215,40 +218,6 @@ function FallbackThumb({ compact }: { compact?: boolean } = {}) {
       }}
     >
       <Bookmark className={compact ? 'h-5 w-5 text-[#1f1f1f]' : 'h-10 w-10 text-[#1f1f1f]'} />
-    </div>
-  );
-}
-
-export function NewsCardSkeleton({ variant = 'default' }: { variant?: 'hero' | 'default' | 'compact' }) {
-  if (variant === 'hero') {
-    return (
-      <div className="animate-pulse overflow-hidden rounded-3xl border border-[#1f1f1f] bg-[#0d0d0d]">
-        <div className="aspect-[21/9] w-full bg-[#141414]" />
-      </div>
-    );
-  }
-  if (variant === 'compact') {
-    return (
-      <div className="animate-pulse rounded-xl border border-[#1f1f1f] bg-[#0d0d0d] p-2.5">
-        <div className="flex gap-3">
-          <div className="h-16 w-20 shrink-0 rounded-lg bg-[#141414]" />
-          <div className="flex-1 space-y-2">
-            <div className="h-2 w-16 rounded bg-[#141414]" />
-            <div className="h-3 w-full rounded bg-[#141414]" />
-            <div className="h-3 w-2/3 rounded bg-[#141414]" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="animate-pulse overflow-hidden rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d]">
-      <div className="aspect-[16/9] w-full bg-[#141414]" />
-      <div className="space-y-3 p-4">
-        <div className="h-3 w-24 rounded bg-[#141414]" />
-        <div className="h-4 w-full rounded bg-[#141414]" />
-        <div className="h-4 w-3/4 rounded bg-[#141414]" />
-      </div>
     </div>
   );
 }
