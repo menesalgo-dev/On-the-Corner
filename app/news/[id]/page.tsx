@@ -1,3 +1,8 @@
+/**
+ * app/news/[id]/page.tsx
+ * Dettaglio singola notizia identificata tramite hash univoco.
+ * Mostra immagine grande + descrizione + pulsante link esterno originale.
+ */
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -11,6 +16,7 @@ import { fetchNewsByHash, fetchLatestNews, fetchUserBookmarkHashes } from '@/lib
 import { formatRelative } from '@/lib/utils';
 import { toNewsCardData } from '@/lib/news/types';
 
+// Rigenerazione incrementale (ISR) mantenuta a 10 minuti come da blueprint
 export const revalidate = 600;
 
 interface PageProps { params: Promise<{ id: string }>; }
@@ -44,7 +50,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
     <>
       <Header />
       <main className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12 bg-[#080808]">
-        <Link href="/news" className="mb-6 inline-flex items-center gap-1.5 text-xs uppercase tracking-widest text-zinc-500 transition hover:text-[#e8c800]" style={{ fontFamily: 'var(--font-dm-mono)' }}>
+        <Link href="/news" className="mb-6 inline-flex items-center gap-1.5 text-xs uppercase tracking-widest text-zinc-500 transition hover:text-[#e8c800]" style={{ fontFamily: 'var(--font-digest-mono)' }}>
           <ArrowLeft className="h-3.5 w-3.5" /> Indietro
         </Link>
 
@@ -79,8 +85,10 @@ export default async function NewsDetailPage({ params }: PageProps) {
             <Link href={news.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-[#e8c800] px-5 py-3 text-sm uppercase tracking-wider text-black font-black transition hover:scale-[1.02]" style={{ fontFamily: 'var(--font-archivo-black)' }}>
               Leggi su {news.source_name} <ExternalLink className="h-4 w-4" />
             </Link>
+            
             <div className="flex items-center gap-2 ml-sm-auto">
-              <BookmarkButton newsId={news.id} initialBookmarked={isBookmarked} />
+              {/* FIX ALLINEAMENTO PROPS: Cambiato newsId={news.id} in newsHash={news.id} */}
+              <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
               <span className="text-xs text-zinc-500 font-mono hidden sm:inline">
                 {isBookmarked ? 'Salvata nei preferiti' : 'Salva per dopo'}
               </span>
