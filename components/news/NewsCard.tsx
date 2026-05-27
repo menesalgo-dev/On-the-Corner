@@ -1,11 +1,12 @@
 /**
  * components/news/NewsCard.tsx
- * Card notizia con 3 varianti: hero, default, compact.
- * Corretto: Naviga sulle pagine interne di dettaglio usando l'hash.
+ * Card notizia Premium Minimal - Varianti: hero, default, compact.
+ * Ottimizzato: Sinossi estese ad alta densità informativa e integrazione token otc.
  */
+import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Bookmark } from 'lucide-react';
+import { Bookmark, ArrowUpRight } from 'lucide-react';
 import { BookmarkButton } from './BookmarkButton';
 import { formatRelative } from '@/lib/utils';
 
@@ -41,56 +42,51 @@ export function NewsCard({ news, isBookmarked = false, variant = 'default' }: Pr
 
 function HeroVariant({ news, isBookmarked }: InternalProps) {
   return (
-    <article className="group relative overflow-hidden rounded-3xl border border-[#1f1f1f] bg-[#0d0d0d] transition hover:border-[#e8c800]/40">
-      {/* CORREZIONE: Punta al dettaglio interno /news/[hash] senza target _blank */}
+    <article className="group relative overflow-hidden rounded-2xl border border-otc-line bg-otc-surface transition duration-300 hover:border-zinc-700/80">
       <Link href={`/news/${news.id}`} prefetch={false} className="block">
-        <div className="relative aspect-[16/9] w-full sm:aspect-[21/9]">
+        <div className="relative aspect-[16/9] w-full sm:aspect-[21/9] bg-otc-bg">
           {news.image_url ? (
             <Image
               src={news.image_url}
               alt=""
               fill
-              sizes="(min-width: 1024px) 900px, 100vw"
-              className="object-cover transition-transform duration-700 group-hover:scale-105"
+              sizes="(min-width: 1024px) 1200px, 100vw"
+              className="object-cover opacity-85 transition-transform duration-700 ease-out group-hover:scale-[1.01] group-hover:opacity-100"
               unoptimized
               priority
             />
           ) : (
             <FallbackThumb />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-otc-bg via-otc-bg/50 to-transparent" />
         </div>
-        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
-          <div className="mb-3 flex items-center gap-2">
-            <span
-              className="rounded-md bg-[#e8c800] px-2 py-0.5 text-[10px] uppercase tracking-widest text-black"
-              style={{ fontFamily: 'var(--font-archivo-black)' }}
-            >
-              {news.source_name}
-            </span>
+        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+          <div className="mb-2.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-400 font-mono">
+            <span className="text-otc-accent font-bold">{news.source_name}</span>
+            <span className="text-zinc-700">•</span>
             {news.category_name && (
-              <span className="rounded-md border border-[#e8c800]/30 px-2 py-0.5 text-[10px] uppercase tracking-widest text-[#e8c800]">
-                {news.category_emoji} {news.category_name}
-              </span>
+              <>
+                <span className="text-zinc-300">{news.category_name}</span>
+                <span className="text-zinc-700">•</span>
+              </>
             )}
-            <span className="text-[11px] uppercase tracking-wider text-zinc-400" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-              {formatRelative(news.published_at)}
-            </span>
+            <span suppressHydrationWarning>{formatRelative(news.published_at)}</span>
           </div>
-          <h2
-            className="text-xl uppercase leading-[1.05] tracking-tight text-white sm:text-3xl lg:text-4xl"
-            style={{ fontFamily: 'var(--font-archivo-black)' }}
+          <h2 
+            className="text-xl font-bold tracking-tight text-zinc-100 sm:text-2xl lg:text-3xl max-w-4xl group-hover:text-otc-accent transition-colors duration-200 uppercase leading-[1.05]"
+            style={{ fontFamily: 'var(--font-display)' }}
           >
             {news.title}
           </h2>
+          {/* 📝 SINOSSI HERO ESTESA: Allungata a 4 righe dense per massima informazione */}
           {news.description && (
-            <p className="mt-2 line-clamp-2 max-w-2xl text-sm text-zinc-300 sm:text-base">
+            <p className="mt-2 line-clamp-4 max-w-3xl text-xs text-zinc-400 leading-relaxed font-normal">
               {news.description}
             </p>
           )}
         </div>
       </Link>
-      <div className="absolute right-4 top-4 z-10">
+      <div className="absolute right-4 top-4 z-10 opacity-60 group-hover:opacity-100 transition-opacity">
         <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
       </div>
     </article>
@@ -99,55 +95,50 @@ function HeroVariant({ news, isBookmarked }: InternalProps) {
 
 function DefaultVariant({ news, isBookmarked }: InternalProps) {
   return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] transition hover:-translate-y-1 hover:border-[#e8c800]/40 hover:shadow-[0_14px_40px_-20px_rgba(232,200,0,0.35)]">
-      {/* CORREZIONE: Punta al dettaglio interno /news/[hash] senza target _blank */}
+    <article className="group flex flex-col overflow-hidden rounded-xl border border-otc-line bg-otc-surface transition duration-300 hover:-translate-y-0.5 hover:border-zinc-700/60 hover:shadow-glow">
       <Link href={`/news/${news.id}`} prefetch={false} className="block">
-        <div className="relative aspect-[16/9] w-full overflow-hidden">
+        <div className="relative aspect-[16/9] w-full overflow-hidden bg-otc-bg border-b border-otc-line">
           {news.image_url ? (
             <Image
               src={news.image_url}
               alt=""
               fill
-              sizes="(min-width: 1024px) 320px, (min-width: 640px) 50vw, 100vw"
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              sizes="(min-width: 1024px) 400px, 100vw"
+              className="object-cover opacity-85 transition-transform duration-500 ease-out group-hover:scale-[1.02]"
               unoptimized
             />
           ) : (
             <FallbackThumb />
           )}
-          {news.category_emoji && (
-            <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-xs backdrop-blur-sm">
-              {news.category_emoji}
-            </span>
-          )}
         </div>
         <div className="flex flex-1 flex-col p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <span
-              className="text-[10px] uppercase tracking-widest text-[#e8c800]"
-              style={{ fontFamily: 'var(--font-dm-mono)' }}
-            >
-              {news.source_name}
-            </span>
-            <span className="text-[10px] text-zinc-600" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-              · {formatRelative(news.published_at)}
-            </span>
+          <div className="mb-2 flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+            <span className="text-otc-accent font-bold">{news.source_name}</span>
+            <span>•</span>
+            <span suppressHydrationWarning>{formatRelative(news.published_at)}</span>
           </div>
-          <h3
-            className="line-clamp-3 text-sm uppercase leading-tight tracking-tight text-white transition group-hover:text-[#e8c800] sm:text-base"
-            style={{ fontFamily: 'var(--font-archivo-black)' }}
+          <h3 
+            className="line-clamp-2 text-sm font-bold uppercase leading-tight tracking-tight text-zinc-200 group-hover:text-otc-accent transition-colors duration-200 mb-2.5"
+            style={{ fontFamily: 'var(--font-display)' }}
           >
             {news.title}
           </h3>
+          {/* 📝 SINOSSI DEFAULT INSERITA: Mostra fino a 3 righe per arricchire la visualizzazione */}
+          {news.description && (
+            <p className="line-clamp-3 text-xs text-zinc-500 leading-relaxed font-normal">
+              {news.description}
+            </p>
+          )}
         </div>
       </Link>
-      <div className="flex items-center justify-between border-t border-[#1f1f1f] px-4 py-2">
-        {news.category_name ? (
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">{news.category_name}</span>
-        ) : (
-          <span />
-        )}
-        <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
+      {/* 🛠️ NUOVA POSIZIONE TASTO SEGNALIBRI: Spostato in basso a destra per pulizia visiva */}
+      <div className="flex items-center justify-between border-t border-otc-line px-4 py-2.5 bg-[#050507] mt-auto">
+        <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">
+          {news.category_name || 'Sport'}
+        </span>
+        <div className="opacity-40 group-hover:opacity-100 transition-opacity">
+          <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
+        </div>
       </div>
     </article>
   );
@@ -155,37 +146,33 @@ function DefaultVariant({ news, isBookmarked }: InternalProps) {
 
 function CompactVariant({ news }: InternalProps) {
   return (
-    <article className="group flex gap-3 rounded-xl border border-[#1f1f1f] bg-[#0d0d0d] p-2.5 transition hover:border-[#e8c800]/40">
-      {/* CORREZIONE: Punta al dettaglio interno /news/[hash] senza target _blank */}
-      <Link href={`/news/${news.id}`} prefetch={false} className="flex flex-1 gap-3">
-        <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-lg">
+    <article className="group flex gap-3 rounded-lg border border-otc-line bg-otc-surface p-2 transition duration-200 hover:border-zinc-800/80">
+      <Link href={`/news/${news.id}`} prefetch={false} className="flex flex-1 gap-3 items-center">
+        <div className="relative h-11 w-14 shrink-0 overflow-hidden rounded bg-otc-bg border border-otc-line">
           {news.image_url ? (
-            <Image
-              src={news.image_url}
-              alt=""
-              fill
-              sizes="80px"
-              className="object-cover"
-              unoptimized
+            <Image 
+              src={news.image_url} 
+              alt="" 
+              fill 
+              sizes="56px" 
+              className="object-cover opacity-85" 
+              unoptimized 
             />
           ) : (
             <FallbackThumb compact />
           )}
         </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="mb-1 flex items-center gap-1.5">
-            <span className="text-[9px] uppercase tracking-widest text-[#e8c800]" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-              {news.source_name}
-            </span>
-            <span className="text-[9px] text-zinc-600">·</span>
-            <span className="text-[9px] text-zinc-500" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-              {formatRelative(news.published_at)}
-            </span>
+        <div className="flex min-w-0 flex-1 flex-col justify-center">
+          <div className="mb-0.5 flex items-center gap-1.5 text-[8px] font-mono uppercase tracking-wider text-zinc-500">
+            <span className="text-otc-accent">{news.source_name}</span>
+            <span>•</span>
+            <span suppressHydrationWarning>{formatRelative(news.published_at)}</span>
           </div>
-          <h3 className="line-clamp-2 text-xs font-semibold leading-tight text-white transition group-hover:text-[#e8c800]">
+          <h4 className="line-clamp-1 text-xs font-semibold leading-tight text-zinc-300 group-hover:text-otc-accent transition-colors">
             {news.title}
-          </h3>
+          </h4>
         </div>
+        <ArrowUpRight className="h-3 w-3 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity mr-1" />
       </Link>
     </article>
   );
@@ -193,14 +180,8 @@ function CompactVariant({ news }: InternalProps) {
 
 function FallbackThumb({ compact }: { compact?: boolean } = {}) {
   return (
-    <div
-      className="absolute inset-0 flex items-center justify-center bg-[#141414]"
-      style={{
-        backgroundImage:
-          'radial-gradient(circle at 30% 50%, rgba(232,200,0,0.08), transparent 60%), linear-gradient(135deg, #141414 0%, #0d0d0d 100%)',
-      }}
-    >
-      <Bookmark className={compact ? 'h-5 w-5 text-[#1f1f1f]' : 'h-10 w-10 text-[#1f1f1f]'} />
+    <div className="absolute inset-0 flex items-center justify-center bg-otc-surface-2 border border-otc-line/40 rounded-lg">
+      <Bookmark className={compact ? 'h-3 w-3 text-zinc-800' : 'h-5 w-5 text-zinc-800'} />
     </div>
   );
 }
