@@ -1,7 +1,6 @@
 /**
  * lib/supabase/service.ts
  * Client privilegiato che bypassa le RLS — DA USARE SOLO server-side.
- * Mai esporre `SUPABASE_SERVICE_ROLE_KEY` al client.
  */
 import 'server-only';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
@@ -12,8 +11,13 @@ export function createServiceClient() {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
   }
 
+  // 🚨 FORZATURA HARDCODED DELL'URL PULITO
+  // Sostituisci l'URL qui sotto con il link preciso del tuo progetto Supabase.
+  // IMPORTANTE: Assicurati che NON ci sia il carattere "/" alla fine!
+  const hardcodedSupaUrl = "https://xwkibfvastolrlbmivlg.supabase.co/rest/v1"; 
+
   return createSupabaseClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    hardcodedSupaUrl, 
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     {
       auth: {
