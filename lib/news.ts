@@ -21,8 +21,7 @@ interface AnyRow {
 }
 
 function toCard(r: AnyRow): NewsCardData {
-  // Se l'id primario bigint non è popolato, usa la stringa hash univoca inserita dal cron job
-  const finalId = r.id ? String(r.id) : (r.hash ? String(r.hash) : '');
+  const finalId = r.hash ? String(r.hash) : (r.id ? String(r.id) : '');
 
   return {
     id: finalId,
@@ -33,8 +32,8 @@ function toCard(r: AnyRow): NewsCardData {
     source_name: String(r.source_name ?? ''),
     published_at: String(r.published_at ?? ''),
     category_id: r.category_id ? String(r.category_id) : null,
-    category_name: r.category_name ? String(r.category_name) : String(r.category_id ?? ''),
-    category_emoji: r.category_emoji ? String(r.category_emoji) : '📰',
+    category_name: r.category_id ? String(r.category_id).toUpperCase() : 'ALTRO',
+    category_emoji: '📰',
   };
 }
 
@@ -50,17 +49,13 @@ export async function fetchLatestNews(opts: { limit?: number; categoryId?: strin
       .limit(opts.limit ?? 30);
       
     if (opts.categoryId && opts.categoryId !== 'tutto') {
-      q = q.eq('category_id', opts.categoryId);
+      q = q.eq('category_id', opts.categoryId.toLowerCase().trim());
     }
     
     const { data, error } = await q;
-    if (error) {
-      console.error("Errore fetchLatestNews Supabase:", error.message);
-      return [];
-    }
+    if (error) return [];
     return ((data ?? []) as AnyRow[]).map(toCard);
-  } catch (err) {
-    console.error("Errore critico fetchLatestNews:", err);
+  } catch {
     return [];
   }
 }
@@ -81,7 +76,7 @@ export async function fetchNewsPage(opts: {
       .limit(opts.limit ?? 20);
     if (opts.before) q = q.lt('published_at', opts.before);
     if (opts.sourceId) q = q.eq('source_id', opts.sourceId);
-    if (opts.categoryId && opts.categoryId !== 'tutto') q = q.eq('category_id', opts.categoryId);
+    if (opts.categoryId && opts.categoryId !== 'tutto') q = q.eq('category_id', opts.categoryId.toLowerCase().trim());
     
     const { data, error } = await q;
     if (!error && data) return (data as AnyRow[]).map(toCard);
@@ -141,7 +136,7 @@ export async function fetchTickerItems(): Promise<
     .order('published_at', { ascending: false })
     .limit(14);
   return ((data ?? []) as AnyRow[]).map((r) => ({
-    id: r.id ? String(r.id) : (r.hash ? String(r.hash) : ''),
+    id: r.hash ? String(r.hash) : (r.id ? String(r.id) : ''),
     title: String(r.title ?? ''),
     link: String(r.link ?? ''),
     source_name: String(r.source_name ?? ''),
@@ -182,19 +177,30 @@ export async function fetchCategoryCounts(): Promise<Map<string, number>> {
   try {
     const { data } = await supabase.from('news_items').select('category_id');
     const m = new Map<string, number>();
+    
+    // Inizializza a 0 i contatori principali per evitare undefined sulla mappa
+    m.set('tutto', 0);
+    m.set('calcio', 0);
+    m.set('f1', 0);
+    m.set('tennis', 0);
+    m.set('motogp', 0);
+
+    let totale = 0;
     (data ?? []).forEach((r: { category_id: unknown }) => {
       if (r.category_id) {
-        const key = String(r.category_id);
+        const key = String(r.category_id).toLowerCase().trim();
         m.set(key, (m.get(key) ?? 0) + 1);
+        totale++;
       }
     });
+    m.set('tutto', totale);
     return m;
   } catch {
     return new Map();
   }
 }
 
-/** Generazione delle categorie hardcoded per corrispondere alle tab del frontend */
+/** Configurazione fissa delle categorie allineata alle chiavi del DB */
 export async function fetchCategories(): Promise<
   { id: string; name: string; short_name: string | null; emoji: string | null; sort_order: number }[]
 > {
