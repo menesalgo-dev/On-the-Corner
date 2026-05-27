@@ -92,8 +92,8 @@ interface NewsRow {
   lang: 'it' | 'en';
   priority: number;
   published_at: string;
-  tags: string; // Salvato come stringa JSON per compatibilità PG
-  category_id: string; // ✅ Mappato correttamente
+  tags: string[]; // ✅ Ripristinato array di stringhe nativo
+  category_id: string;
 }
 
 function toRow(n: NewsItem): NewsRow {
@@ -108,8 +108,8 @@ function toRow(n: NewsItem): NewsRow {
     lang: n.lang || 'it',
     priority: n.priority || 50,
     published_at: n.publishedAt || new Date().toISOString(),
-    tags: JSON.stringify(n.tags || []),
-    category_id: n.categoryId || 'altro', // ✅ Inserisce il valore nella nuova colonna del DB
+    tags: n.tags || [], // ✅ Passato come array nativo per evitare l'errore malformed array literal
+    category_id: n.categoryId || 'altro',
   };
 }
 
