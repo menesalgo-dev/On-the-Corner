@@ -1,86 +1,62 @@
 /**
- * app/(auth)/signup/page.tsx — Pagina di registrazione.
- * VERSIONE CON BYPASS TEMPORANEO - Salta registrazione per test
+ * app/signup/page.tsx
  */
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Logo } from '@/components/brand/Logo';
 import { createClient } from '@/lib/supabase/server';
+import { SignupForm } from './SignupForm';
 
-interface PageProps {
-  searchParams: Promise<{ error?: string; sent?: string }>;
-}
+export const metadata = {
+  title: 'Registrati',
+};
 
-export default async function SignupPage({ searchParams }: PageProps) {
-  const params = await searchParams;
-
-  async function signupAction(formData: FormData) {
-    'use server';
-    
-    const supabase = await createClient();
-
-    // === BYPASS TEMPORANEO - Entra direttamente ===
-    const testEmail = 'test@on-the-corner.it';
-    const testPassword = '12345678';
-
-    // Prova a fare login
-    let { error } = await supabase.auth.signInWithPassword({
-      email: testEmail,
-      password: testPassword,
-    });
-
-    // Se non esiste, crealo e poi loggati
-    if (error) {
-      await supabase.auth.signUp({
-        email: testEmail,
-        password: testPassword,
-        options: {
-          data: { username: 'testuser', full_name: 'Test User' },
-        },
-      });
-
-      // Login dopo la creazione
-      await supabase.auth.signInWithPassword({
-        email: testEmail,
-        password: testPassword,
-      });
-    }
-
-    redirect('/'); // Vai direttamente alla home
-  }
+export default async function SignupPage() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (data.user) redirect('/');
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4 py-10">
+    <main className="flex min-h-dvh items-center justify-center px-4 py-12 sm:py-20">
       <div className="w-full max-w-md">
-        <Link href="/" className="mb-10 flex items-center justify-center">
-          <Logo size={56} withWordmark />
+        <Link href="/" className="mb-8 flex flex-col items-center">
+          <Logo size={56} />
+          <span
+            className="mt-3 text-xl uppercase tracking-tight text-white"
+            style={{ fontFamily: 'var(--font-archivo-black)' }}
+          >
+            On The <span className="text-[#e8c800]">Corner</span>
+          </span>
         </Link>
 
-        <div className="rounded-3xl border border-zinc-900 bg-zinc-950/60 p-7 shadow-2xl backdrop-blur">
-          <h1 className="font-[var(--font-archivo-black)] text-2xl uppercase tracking-tight">
-            Modalità Test
+        <div className="rounded-3xl border border-[#1f1f1f] bg-[#0d0d0d] p-8">
+          <h1
+            className="text-2xl uppercase tracking-tight text-white"
+            style={{ fontFamily: 'var(--font-archivo-black)' }}
+          >
+            Inizia gratis
           </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Clicca sul pulsante per entrare direttamente come utente di test.
+          <p className="mt-2 text-sm text-zinc-400">
+            Crea un account in 30 secondi.
           </p>
 
-          <form action={signupAction} className="mt-8">
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-[#e8c800] py-4 font-[var(--font-archivo-black)] text-lg uppercase tracking-wider text-black transition hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(232,200,0,0.5)]"
-            >
-              ENTRA COME TEST USER
-            </button>
-          </form>
+          <SignupForm />
 
-          <p className="mt-6 text-center text-xs text-zinc-500">
-            (Bypass temporaneo per sviluppo)
+          <p className="mt-6 text-center text-sm text-zinc-400">
+            Hai già un account?{' '}
+            <Link href="/login" className="font-bold text-[#e8c800] hover:underline">
+              Accedi
+            </Link>
           </p>
         </div>
 
-        <p className="mt-8 text-center font-mono text-[10px] uppercase tracking-widest text-zinc-600">
-          <Link href="/" className="hover:text-zinc-400">← Torna alla home</Link>
-        </p>
+        <Link
+          href="/"
+          className="mt-6 block text-center text-xs uppercase tracking-widest text-zinc-500 hover:text-[#e8c800]"
+          style={{ fontFamily: 'var(--font-dm-mono)' }}
+        >
+          ← Torna al sito
+        </Link>
       </div>
     </main>
   );
