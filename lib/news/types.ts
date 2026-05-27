@@ -1,7 +1,7 @@
 /**
  * lib/news/types.ts
  * Tipi condivisi tra RSS parser e integratori API esterne.
- * Aggiornato con helper di mappatura nativi per PostgreSQL (Supabase) ed estensione interfaccia.
+ * Allineato al 100% alla struttura dati fisica del Database e di NewsCard.
  */
 import type { CategoryId } from '@/lib/rss/config';
 
@@ -20,18 +20,18 @@ export interface NewsItem {
   categoryId: CategoryId;
 }
 
-/**
- * Estensione per garantire la massima retrocompatibilità tra componenti UI originali e nuovi moduli.
- * Previene i crash di tipo "missing properties" lasciando inalterati controlli e layout grafici.
- */
-export interface NewsCardData extends NewsItem {
-  id?: string;
-  image_url?: string | null;
-  source_name?: string;
-  published_at?: string;
-  category_id?: string | number;
-  category_name?: string;
-  category_emoji?: string;
+// L'interfaccia originale della card diventa il contratto di passaggio dati globale
+export interface NewsCardData {
+  id: string; // Rappresenta l'hash logico della notizia
+  title: string;
+  link: string;
+  description: string | null;
+  image_url: string | null;
+  source_name: string;
+  published_at: string;
+  category_id?: string | null;
+  category_name?: string | null;
+  category_emoji?: string | null;
 }
 
 const STRIP_TAGS = /<[^>]+>/g;
@@ -83,10 +83,6 @@ export async function sha1(input: string): Promise<string> {
     .join('');
 }
 
-/**
- * Distanza Levenshtein normalizzata (1 = identici, 0 = totalmente diversi).
- * Type-safe per strict mode.
- */
 export function similarity(a: string, b: string): number {
   if (a === b) return 1;
   if (!a.length || !b.length) return 0;
@@ -110,43 +106,29 @@ export function similarity(a: string, b: string): number {
 }
 
 /**
- * Mappa un oggetto NewsItem (CamelCase) nel record SnakeCase richiesto dal database.
- * Risolve definitivamente l'errore malformed array literal forzando un array di stringhe nativo.
+ * Converte i record grezzi estratti in snake_case dal database Supabase
+ * nell'oggetto tipizzato NewsCardData atteso nativamente dai tuoi componenti UI.
  */
-export function toDatabaseRow(item: NewsItem) {
-  return {
-    hash: item.hash,
-    source_id: item.sourceId,
-    source_name: item.sourceName,
-    title: item.title,
-    link: item.link,
-    description: item.description,
-    image_url: item.imageUrl,
-    lang: item.lang,
-    priority: item.priority,
-    published_at: item.publishedAt,
-    tags: Array.isArray(item.tags) ? item.tags : [], // Fix nativo array per PostgreSQL
-    category_id: item.categoryId
+export function toNewsCardData(row: any): NewsCardData {
+  const categoryMeta: Record<string, { name: string; emoji: string }> = {
+    '1': { name: 'Calcio', emoji: '⚽' },
+    '2': { name: 'F1', emoji: '🏎️' },
+    '3': { name: 'Tennis', emoji: '🎾' },
+    '4': { name: 'MotoGP', emoji: '🏍️' }
   };
-}
 
-/**
- * Converte una riga estratta dal database (SnakeCase) nell'interfaccia NewsItem (CamelCase)
- * utilizzata dai componenti del frontend.
- */
-export function toFrontendItem(row: any): NewsItem {
+  const meta = categoryMeta[String(row.category_id || '')];
+
   return {
-    hash: row.hash,
-    sourceId: row.source_id,
-    sourceName: row.source_name,
-    title: row.title,
-    link: row.link,
-    description: row.description,
-    imageUrl: row.image_url,
-    lang: row.lang,
-    priority: row.priority,
-    publishedAt: row.published_at,
-    tags: row.tags || [],
-    categoryId: row.category_id
+    id: row.hash, // L'hash sostituisce l'id numerico per uniformità logica
+    title: row.title || '',
+    link: row.link || row.url || '',
+    description: row.description || row.summary || null,
+    image_url: row.image_url,
+    source_name: row.source_name || row.source || 'Inconnu',
+    published_at: row.published_at,
+    category_id: row.category_id ? String(row.category_id) : null,
+    category_name: meta ? meta.name : null,
+    category_emoji: meta ? meta.emoji : null,
   };
 }
