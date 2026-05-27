@@ -44,7 +44,8 @@ export async function getNewsItems({ category, source, page = 1, limit = 20 }: F
         'calcio': 1, 
         'f1': 2, 
         'tennis': 3, 
-        'motogp': 4 
+        'motogp': 4,
+        'Fantacalcio': 5
       };
       
       const mappedId = categoryMapping[category.toLowerCase()];
