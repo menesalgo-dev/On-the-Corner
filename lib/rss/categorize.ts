@@ -1,14 +1,7 @@
 /**
  * lib/rss/categorize.ts
- * Sistema di categorizzazione per notizie. Replica e migliora il sito vecchio.
- *
- * Strategia:
- *  1. Se la fonte ha `forceCat` → usa quella (override hard)
- *  2. Altrimenti analizza titolo + descrizione con keyword pesate
- *  3. Vince la categoria con punteggio totale più alto
- *  4. Sotto soglia minima (2 punti) → fallback 'altro'
+ * Sistema di categorizzazione automatica per notizie.
  */
-
 import type { CategoryId, FeedSource } from './config';
 
 interface Keyword {
@@ -18,7 +11,6 @@ interface Keyword {
 
 const KW: Record<Exclude<CategoryId, 'altro'>, Keyword[]> = {
   calcio: [
-    // Leghe e tornei
     { pattern: /\bserie\s*a\b/i, weight: 3 },
     { pattern: /\bserie\s*b\b/i, weight: 3 },
     { pattern: /\bpremier\s*league\b/i, weight: 3 },
@@ -31,11 +23,8 @@ const KW: Record<Exclude<CategoryId, 'altro'>, Keyword[]> = {
     { pattern: /\bnazionale\b/i, weight: 2 },
     { pattern: /\bmondiali\b/i, weight: 2 },
     { pattern: /\beuropei\b/i, weight: 2 },
-    // Squadre Serie A top
     { pattern: /\b(juventus|juve|inter|milan|napoli|roma|lazio|atalanta|fiorentina|bologna|torino|genoa|udinese)\b/i, weight: 3 },
-    // Squadre estere top
     { pattern: /\b(real\s*madrid|barcelona|barça|psg|bayern|manchester|liverpool|chelsea|arsenal|city|united|tottenham|atletico)\b/i, weight: 3 },
-    // Generici
     { pattern: /\bcalcio(?!mercato)\b/i, weight: 1 },
     { pattern: /\bcalciomercato\b/i, weight: 2 },
     { pattern: /\b(gol|goal|rigore|allenatore|mister)\b/i, weight: 1 },
@@ -95,18 +84,15 @@ const KW: Record<Exclude<CategoryId, 'altro'>, Keyword[]> = {
   ],
 };
 
-const MIN_SCORE_TO_CATEGORIZE = 2;
+const MIN_SCORE = 2;
 
-/**
- * Categorizza una notizia.
- */
+/** Categorizza una notizia. */
 export function categorize(
-  feed: FeedSource,
+  feed: Pick<FeedSource, 'forceCat'>,
   title: string,
   description?: string | null,
 ): CategoryId {
   if (feed.forceCat) return feed.forceCat;
-
   const text = `${title} ${description ?? ''}`;
   const scores = new Map<CategoryId, number>();
 
@@ -121,32 +107,21 @@ export function categorize(
   if (scores.size === 0) return 'altro';
 
   let winner: CategoryId = 'altro';
-  let max = MIN_SCORE_TO_CATEGORIZE - 1;
+  let max = MIN_SCORE - 1;
   scores.forEach((s, cat) => {
-    if (s > max) {
-      max = s;
-      winner = cat;
-    }
+    if (s > max) { max = s; winner = cat; }
   });
   return winner;
 }
 
-/**
- * Bilanciamento lingua: se IT ≥ thresholdIt, cap EN al enCapPct%.
- */
+/** Bilanciamento lingua: cap EN se IT >= threshold. */
 export function balanceByLanguage<T extends { lang: 'it' | 'en' }>(
-  items: T[],
-  thresholdIt: number,
-  enCapPct: number,
+  items: T[], thresholdIt: number, enCapPct: number,
 ): T[] {
   const it = items.filter((i) => i.lang === 'it');
   const en = items.filter((i) => i.lang === 'en');
-
   if (it.length < thresholdIt) return items;
-
   const ratio = enCapPct / 100;
   const enCap = Math.floor((it.length * ratio) / (1 - ratio));
-  const enKept = en.slice(0, enCap);
-
-  return [...it, ...enKept];
+  return [...it, ...en.slice(0, enCap)];
 }
