@@ -1,6 +1,7 @@
 /**
  * lib/news/types.ts
  * Tipi condivisi e normalizzazione record PostgreSQL (Supabase) in NewsCardData.
+ * Aggiornato: Filtro Anti-Miniature e Forzatura Sinossi HD Estese.
  */
 import type { CategoryId } from '@/lib/rss/config';
 
@@ -113,6 +114,7 @@ export function toNewsCardData(row: any): NewsCardData {
 
   const meta = categoryMeta[String(row.category_id || '')];
 
+  // 1. FILTRO ANTI-MINIATURE E SANIFICAZIONE IMMAGINI
   let cleanImageUrl = row.image_url || row.imageUrl || null;
   if (cleanImageUrl && typeof cleanImageUrl === 'string') {
     cleanImageUrl = cleanImageUrl.trim();
@@ -125,18 +127,38 @@ export function toNewsCardData(row: any): NewsCardData {
       .replace(/&gt;/g, '>')
       .replace(/\s/g, '%20');
 
-    if (cleanImageUrl.includes('data:image/') || cleanImageUrl.endsWith('.svg') || cleanImageUrl.includes('placeholder')) {
-      cleanImageUrl = null;
+    // Scarta icone minuscole, loghi quadrati, avatar e stringhe Base64/SVG non valide per i feed HD
+    if (
+      cleanImageUrl.includes('avatar') ||
+      cleanImageUrl.includes('logo') ||
+      cleanImageUrl.includes('icon') ||
+      cleanImageUrl.includes('placeholder') ||
+      cleanImageUrl.includes('1x1') ||
+      cleanImageUrl.includes('150x150') ||
+      cleanImageUrl.includes('data:image/') || 
+      cleanImageUrl.endsWith('.svg')
+    ) {
+      cleanImageUrl = null; // Sblocca il fallback nativo per evitare foto sgranate o rotte
     }
   } else {
     cleanImageUrl = null;
+  }
+
+  // 2. RECUPERO E OTTIMIZZAZIONE SINOSSI EDITORIALE ESTESA
+  // Unifica tutti i potenziali campi di riepilogo del database per recuperare il testo più denso
+  let cleanDescription = row.description || row.summary || row.content || '';
+  cleanDescription = cleanDescription.trim();
+
+  // Rimuove i tre puntini nativi di troncamento dei feed RSS prima di servire il dato
+  if (cleanDescription.endsWith('...')) {
+    cleanDescription = cleanDescription.slice(0, -3).trim();
   }
 
   return {
     id: row.hash,
     title: row.title || '',
     link: row.link || row.url || '',
-    description: row.description || row.summary || row.content || null,
+    description: cleanDescription.length > 5 ? cleanDescription : null,
     image_url: cleanImageUrl,
     source_name: row.source_name || row.source || 'Premium Source',
     published_at: row.published_at,
