@@ -1,10 +1,11 @@
 /**
  * components/layout/MobileMenu.tsx
- * Menu hamburger per mobile. Si apre con animazione, slide da destra.
+ * Menu hamburger a comparsa laterale per dispositivi mobile.
+ * Allineato con la palette otc, icone miniaturizzate ed estetica premium.
  */
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 
@@ -26,94 +27,92 @@ export function MobileMenu({ navLinks, isLoggedIn }: Props) {
       <button
         onClick={() => setOpen(true)}
         aria-label="Apri menu"
-        className="rounded-lg p-2 text-zinc-300 transition hover:bg-[#141414] hover:text-[#e8c800] lg:hidden"
+        className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-otc-surface hover:text-otc-accent lg:hidden"
       >
-        <Menu className="h-6 w-6" />
+        <Menu className="h-5 w-5" />
       </button>
 
       {open && (
         <>
-          {/* Backdrop */}
+          {/* Sfondo Oscurato Velato (Backdrop) */}
           <div
-            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden"
             onClick={() => setOpen(false)}
           />
 
-          {/* Drawer */}
+          {/* Pannello Scorrevole (Drawer) */}
           <aside
-            className="fixed right-0 top-0 z-50 flex h-dvh w-[280px] flex-col border-l border-[#1f1f1f] bg-[#0d0d0d] p-5 shadow-2xl lg:hidden"
-            style={{ animation: 'slideIn 0.25s ease-out' }}
+            className="fixed right-0 top-0 z-50 flex h-dvh w-[260px] flex-col border-l border-otc-line bg-otc-surface p-5 shadow-2xl lg:hidden"
+            style={{ animation: 'slideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)' }}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-                Menu
+            <div className="flex items-center justify-between border-b border-otc-line pb-3">
+              <span 
+                className="text-[9px] font-mono uppercase tracking-widest text-zinc-500" 
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
+                Navigazione
               </span>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Chiudi menu"
-                className="rounded-lg p-2 text-zinc-400 transition hover:bg-[#141414] hover:text-white"
+                className="rounded-md p-1 text-zinc-500 transition hover:bg-otc-line hover:text-white"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <nav className="mt-8 flex flex-col gap-1">
+            {/* Collegamenti Principali */}
+            <nav className="mt-6 flex flex-col gap-0.5">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="rounded-lg px-4 py-3 text-sm font-bold uppercase tracking-wider text-zinc-200 transition hover:bg-[#141414] hover:text-[#e8c800]"
+                  className="rounded-lg px-3 py-2.5 text-xs font-semibold uppercase tracking-widest text-zinc-400 transition hover:bg-otc-line hover:text-otc-accent"
                 >
                   {link.label}
                 </Link>
               ))}
             </nav>
 
-            <div className="mt-auto space-y-2 border-t border-[#1f1f1f] pt-5">
+            {/* Area Account Inferiore */}
+            <div className="mt-auto space-y-2 border-t border-otc-line pt-5">
               {isLoggedIn ? (
                 <>
                   <Link
                     href="/profile"
                     onClick={() => setOpen(false)}
-                    className="block rounded-lg px-4 py-3 text-sm font-bold uppercase tracking-wider text-zinc-200 hover:bg-[#141414] hover:text-[#e8c800]"
+                    className="block rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:bg-otc-line hover:text-otc-accent"
                   >
                     Profilo
                   </Link>
                   <Link
                     href="/dashboard"
                     onClick={() => setOpen(false)}
-                    className="block rounded-lg px-4 py-3 text-sm font-bold uppercase tracking-wider text-zinc-200 hover:bg-[#141414] hover:text-[#e8c800]"
+                    className="block rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:bg-otc-line hover:text-otc-accent"
                   >
                     Dashboard
                   </Link>
-                  <Link
-                    href="/follow"
-                    onClick={() => setOpen(false)}
-                    className="block rounded-lg px-4 py-3 text-sm font-bold uppercase tracking-wider text-zinc-200 hover:bg-[#141414] hover:text-[#e8c800]"
-                  >
-                    Personalizza
-                  </Link>
                 </>
               ) : (
-                <>
+                <div className="grid grid-cols-2 gap-2 pt-1">
                   <Link
                     href="/login"
                     onClick={() => setOpen(false)}
-                    className="block rounded-xl border border-[#1f1f1f] py-3 text-center text-sm font-bold uppercase tracking-wider text-zinc-200 transition hover:border-[#e8c800]/40 hover:text-[#e8c800]"
-                    style={{ fontFamily: 'var(--font-archivo-black)' }}
+                    className="block rounded-lg border border-otc-line py-2 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-400 transition hover:border-otc-accent/30 hover:text-otc-accent"
+                    style={{ fontFamily: 'var(--font-display)' }}
                   >
                     Accedi
                   </Link>
                   <Link
                     href="/signup"
                     onClick={() => setOpen(false)}
-                    className="block rounded-xl bg-[#e8c800] py-3 text-center text-sm font-bold uppercase tracking-wider text-black transition hover:scale-[1.02]"
-                    style={{ fontFamily: 'var(--font-archivo-black)' }}
+                    className="block rounded-lg bg-otc-accent py-2 text-center text-[10px] font-bold uppercase tracking-wider text-black transition hover:opacity-90"
+                    style={{ fontFamily: 'var(--font-display)' }}
                   >
                     Inizia
                   </Link>
-                </>
+                </div>
               )}
             </div>
 
