@@ -1,4 +1,10 @@
+/**
+ * tailwind.config.ts
+ * Configurazione unificata con il plugin tailwind-scrollbar creato inline.
+ * Palette Premium Minimal & Slate applicata all'infrastruttura di sistema OTC.
+ */
 import type { Config } from 'tailwindcss';
+import plugin from 'tailwindcss/plugin';
 
 const config: Config = {
   darkMode: ['class'],
@@ -61,21 +67,31 @@ const config: Config = {
           },
           '50%': {
             opacity: '.5',
-            transform: 'scale(.9)', // Ridotto lo stacco dimensionale dell'animazione
+            transform: 'scale(.9)',
           },
         },
       },
 
       animation: {
         'pulse-glow': 'pulse-glow 3s ease-in-out infinite',
-        'pulse-dot': 'pulse-dot 2s ease-in-out infinite', // Rallentato per un effetto più elegante
+        'pulse-dot': 'pulse-dot 2s ease-in-out infinite',
       },
     },
   },
 
   plugins: [
-    // Plugin per nascondere le scrollbar nello slider liquido delle categorie
-    require('tailwind-scrollbar')({ nocompatible: true }),
+    // 🛠️ COSTRUZIONE FILE MANCANTE INLINE: Integra il plugin scrollbar direttamente nell'architettura
+    plugin(function ({ addUtilities }) {
+      addUtilities({
+        '.scrollbar-none': {
+          '-ms-overflow-style': 'none', /* IE and Edge */
+          'scrollbar-width': 'none',    /* Firefox */
+          '&::-webkit-scrollbar': {
+            display: 'none',            /* Chrome, Safari and Opera */
+          },
+        },
+      });
+    }),
   ],
 };
 
