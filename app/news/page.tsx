@@ -1,9 +1,11 @@
 /**
  * app/news/page.tsx
  * Feed completo news con filtri categoria + fonte + paginazione.
- * Versione integrata: mantiene tutte le funzioni esistenti
- * (fetchNewsPage, CategoryTabs, EmptyState, filtro fonti dinamico)
- * e aggiunge breadcrumb home, paginazione, CTA torna alla home.
+ * Allineato alle funzioni reali di lib/news.ts:
+ *   - getNewsItems(category, source, page, limit) → { news, count }
+ *   - fetchUserBookmarkHashes() → Set<string>
+ *   - fetchCategoryCounts() → Map<string, number>
+ *   - fetchCategories() → categories array
  */
 import Link from 'next/link';
 import { ChevronLeft, Home as HomeIcon } from 'lucide-react';
@@ -14,9 +16,8 @@ import { NewsCard } from '@/components/news/NewsCard';
 import { CategoryTabs } from '@/components/news/CategoryTabs';
 import { EmptyState } from '@/components/shared/EmptyState';
 import {
-  fetchNewsPage,
-  fetchUserBookmarkIds,
-  fetchNewsStats,
+  getNewsItems,
+  fetchUserBookmarkHashes,
   fetchCategoryCounts,
   fetchCategories,
 } from '@/lib/news';
@@ -24,6 +25,25 @@ import {
 export const revalidate = 120;
 
 const PAGE_SIZE = 60;
+
+// Lista fonti italiane più frequenti (in attesa di una fetchNewsStats backend)
+const TOP_SOURCES = [
+  'Gazzetta',
+  'Corriere Sport',
+  'Sky Sport',
+  'Eurosport',
+  'Tuttosport',
+  'Repubblica Calcio',
+  'Repubblica F1',
+  'Repubblica Tennis',
+  'SportMediaset',
+  'ANSA Sport',
+  'Calciomercato.com',
+  'FormulaPassion',
+  'GPone',
+  'NewsAPI',
+  'GNews',
+];
 
 interface PageProps {
   searchParams: Promise<{ source?: string; category?: string; page?: string }>;
@@ -34,29 +54,33 @@ export async function generateMetadata({ searchParams }: PageProps) {
   const cat = params.category && params.category !== 'all' ? params.category : undefined;
   return {
     title: cat ? `News ${cat} — On The Corner` : 'Tutte le notizie sportive',
-    description: 'Notizie aggregate da 21 fonti italiane e internazionali.',
+    description: 'Notizie aggregate da fonti italiane e internazionali.',
   };
 }
 
 export default async function NewsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const activeSource = params.source && params.source !== 'all' ? params.source : undefined;
-  const activeCategory = params.category && params.category !== 'all' ? params.category : undefined;
+  const activeCategory = params.category && params.category !== 'all' && params.category !== 'tutto'
+    ? params.category
+    : undefined;
   const page = Math.max(1, parseInt(params.page ?? '1') || 1);
-  const offset = (page - 1) * PAGE_SIZE;
 
-  const [news, bookmarks, stats, counts, cats] = await Promise.all([
-    fetchNewsPage({
+  // Chiamate parallele alle funzioni reali del backend
+  const [newsResult, bookmarkHashes, counts, cats] = await Promise.all([
+    getNewsItems({
+      category: activeCategory,
+      source: activeSource,
+      page,
       limit: PAGE_SIZE,
-      offset,
-      sourceId: activeSource,
-      categoryId: activeCategory,
-    } as any),
-    fetchUserBookmarkIds(),
-    fetchNewsStats(),
+    }),
+    fetchUserBookmarkHashes(),
     fetchCategoryCounts(),
     fetchCategories(),
   ]);
+
+  const { news, count: totalCount } = newsResult;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const tabs = cats.map((c) => ({
     id: c.id,
@@ -64,12 +88,6 @@ export default async function NewsPage({ searchParams }: PageProps) {
     emoji: c.emoji ?? undefined,
     count: counts.get(c.id) ?? 0,
   }));
-
-  // Calcolo totale per paginazione: usa il count della categoria attiva, o somma di tutti
-  const totalForActive = activeCategory
-    ? (counts.get(activeCategory) ?? 0)
-    : Array.from(counts.values()).reduce((s, n) => s + n, 0);
-  const totalPages = Math.max(1, Math.ceil(totalForActive / PAGE_SIZE));
 
   return (
     <>
@@ -94,7 +112,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
           </span>
         </nav>
 
-        {/* Header con titolo dinamico */}
+        {/* Header */}
         <header className="mb-4 flex items-baseline justify-between">
           <div>
             <h1
@@ -107,15 +125,9 @@ export default async function NewsPage({ searchParams }: PageProps) {
               className="mt-1 text-[10px] uppercase tracking-widest text-zinc-500"
               style={{ fontFamily: 'var(--font-dm-mono)' }}
             >
-              {news.length} su {totalForActive} · pagina {page}/{totalPages}
+              {news.length} su {totalCount} · pagina {page}/{totalPages}
             </p>
           </div>
-          <span
-            className="hidden text-xs uppercase tracking-widest text-zinc-500 sm:inline"
-            style={{ fontFamily: 'var(--font-dm-mono)' }}
-          >
-            {news.length} risultati
-          </span>
         </header>
 
         {/* Tabs categorie */}
@@ -128,17 +140,16 @@ export default async function NewsPage({ searchParams }: PageProps) {
             label="Tutte fonti"
             active={!activeSource}
           />
-          {stats.sources.slice(0, 15).map((s) => {
+          {TOP_SOURCES.map((sourceName) => {
             const sp = new URLSearchParams();
             if (activeCategory) sp.set('category', activeCategory);
-            sp.set('source', s.id);
+            sp.set('source', sourceName);
             return (
               <FilterChip
-                key={s.id}
+                key={sourceName}
                 href={`/news?${sp.toString()}`}
-                label={s.name}
-                count={s.count}
-                active={activeSource === s.id}
+                label={sourceName}
+                active={activeSource === sourceName}
               />
             );
           })}
@@ -155,8 +166,12 @@ export default async function NewsPage({ searchParams }: PageProps) {
           />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {news.map((item) => (
-              <NewsCard key={item.id} news={item} isBookmarked={bookmarks.has(item.id)} />
+            {news.map((item: any) => (
+              <NewsCard
+                key={item.id}
+                news={item}
+                isBookmarked={bookmarkHashes.has(item.hash) || bookmarkHashes.has(item.id)}
+              />
             ))}
           </div>
         )}
