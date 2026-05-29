@@ -28,3 +28,22 @@ export interface MatchRow {
   last_updated: string
   created_at: string
 }
+
+/** Dati match normalizzati dalle API esterne (prima dell'upsert su DB) */
+export interface MatchData {
+  externalId: string
+  sport: MatchSport
+  source: string
+  competition: string | null
+  competitionCode: string | null
+  homeTeam: string
+  awayTeam: string
+  homeTeamLogo: string | null
+  awayTeamLogo: string | null
+  homeScore: number | null
+  awayScore: number | null
+  status: MatchStatus
+  minute: string | null
+  startTime: string
+  venue: string | null
+}
