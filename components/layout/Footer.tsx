@@ -33,7 +33,7 @@ export function Footer() {
       <div className="mx-auto max-w-[1340px] px-5 py-12 sm:px-6 sm:py-14">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 lg:grid-cols-5">
           <div className="col-span-2 sm:col-span-2 lg:col-span-2">
-            <Logo size={28} withWordmark />
+            <Logo size={28} compact />
             <p className="mt-4 max-w-sm text-xs text-zinc-500 leading-relaxed">
               Aggregatore sportivo italiano premium. Notizie aggregate da 21 fonti,
               match live e statistiche in tempo reale.
