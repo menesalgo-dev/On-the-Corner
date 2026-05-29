@@ -32,7 +32,7 @@ export async function Header() {
     <header className="sticky top-0 z-40 border-b border-otc-line bg-otc-bg/80 backdrop-blur-lg">
       <div className="mx-auto flex max-w-[1340px] items-center gap-3 px-5 py-2.5 sm:px-6">
         <Link href="/" className="shrink-0 transition-opacity hover:opacity-90">
-          <Logo size={28} withWordmark />
+          <Logo size={28} compact />
         </Link>
 
         <nav className="ml-8 hidden items-center gap-1 lg:flex">
