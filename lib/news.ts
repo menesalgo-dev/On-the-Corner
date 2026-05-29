@@ -88,14 +88,26 @@ export async function fetchNewsByHash(hash: string) {
   }
 }
 
-/** Recupera le ultime notizie inserite */
-export async function fetchLatestNews({ limit = 6 }: { limit?: number } = {}) {
+/** Recupera le ultime notizie inserite con limite di default 7 */
+export async function fetchLatestNews({ 
+  limit = 7, 
+  categoryId 
+}: { 
+  limit?: number; 
+  categoryId?: string 
+} = {}) {
   try {
-    const { data, error } = await supabaseServer
+    let query = supabaseServer
       .from('news_items')
       .select('*')
-      .order('published_at', { ascending: false })
-      .limit(limit);
+      .order('published_at', { ascending: false });
+
+    // Filtro categoria opzionale
+    if (categoryId && categoryId !== 'tutto') {
+      query = query.eq('category_id', categoryId.toLowerCase().trim());
+    }
+
+    const { data, error } = await query.limit(limit);
 
     if (error) throw error;
     return data || [];
