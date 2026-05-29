@@ -6,7 +6,8 @@
 import Link from 'next/link';
 import { Radio } from 'lucide-react';
 
-interface LiveMatch {
+// Esportiamo l'interfaccia in modo da poterla usare come tipo nella Home e nei servizi
+export interface LiveMatch {
   id: string;
   sport: string;
   homeTeam: string;
