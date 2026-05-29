@@ -5,7 +5,7 @@
  */
 import type { CategoryId } from '@/lib/rss/config';
 
-export interface NewsItem {
+export interface NewsItems {
   hash: string;
   sourceId: string;
   sourceName: string;
