@@ -37,9 +37,11 @@ export interface SyncResult {
 }
 
 function deduplicate(items: NewsItem[]): NewsItem[] {
+  // ✅ Blindiamo Date.parse garantendo una stringa di fallback valida in caso di undefined
   const sorted = [...items].sort((a, b) =>
-    a.priority - b.priority ||
-    Date.parse(b.publishedAt) - Date.parse(a.publishedAt),
+    (a.priority ?? 50) - (b.priority ?? 50) ||
+    Date.parse(b.publishedAt || b.published_at || new Date().toISOString()) - 
+    Date.parse(a.publishedAt || a.published_at || new Date().toISOString()),
   );
 
   const kept: NewsItem[] = [];
@@ -92,24 +94,24 @@ interface NewsRow {
   lang: 'it' | 'en';
   priority: number;
   published_at: string;
-  tags: string[]; // ✅ Ripristinato array di stringhe nativo
+  tags: string[]; 
   category_id: string;
 }
 
 function toRow(n: NewsItem): NewsRow {
   return {
     hash: n.hash,
-    source_id: n.sourceId || 'rss',
-    source_name: n.sourceName,
+    source_id: n.sourceId || n.source_id || 'rss',
+    source_name: n.sourceName || n.source_name || 'On The Corner',
     title: n.title.slice(0, 500),
     link: n.link,
     description: n.description ? n.description.slice(0, 1000) : null,
-    image_url: n.imageUrl || null,
-    lang: n.lang || 'it',
-    priority: n.priority || 50,
-    published_at: n.publishedAt || new Date().toISOString(),
-    tags: n.tags || [], // ✅ Passato come array nativo per evitare l'errore malformed array literal
-    category_id: n.categoryId || 'altro',
+    image_url: n.imageUrl || n.image_url || null,
+    lang: (n.lang as 'it' | 'en') || 'it',
+    priority: n.priority ?? 50,
+    published_at: n.publishedAt || n.published_at || new Date().toISOString(),
+    tags: n.tags || [], 
+    category_id: n.categoryId || n.category_id || 'altro',
   };
 }
 
@@ -164,14 +166,23 @@ export async function runSync(): Promise<SyncResult> {
   const deduped = deduplicate(allItems);
   const balanced = balanceByLanguage(deduped, BALANCE_LANG_THRESHOLD_IT, BALANCE_LANG_EN_CAP_PCT);
 
-  balanced.sort((a, b) => a.priority - b.priority || Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+  // ✅ Proteggiamo anche il secondo ordinamento finale dalle date undefined
+  balanced.sort((a, b) => 
+    (a.priority ?? 50) - (b.priority ?? 50) || 
+    Date.parse(b.publishedAt || b.published_at || new Date().toISOString()) - 
+    Date.parse(a.publishedAt || a.published_at || new Date().toISOString())
+  );
 
   const perCategory: Record<string, number> = {};
-  const perSource = { ...rssResult.perSource };
+  const perSource: Record<string, number> = { ...rssResult.perSource };
+  
   balanced.forEach((i) => {
-    perCategory[i.categoryId] = (perCategory[i.categoryId] ?? 0) + 1;
-    if (!perSource[i.sourceId]) perSource[i.sourceId] = 0;
-    perSource[i.sourceId]! += 1;
+    const catId = i.categoryId || i.category_id || 'altro';
+    const srcId = i.sourceId || i.source_id || 'rss';
+    
+    perCategory[catId] = (perCategory[catId] ?? 0) + 1;
+    if (!perSource[srcId]) perSource[srcId] = 0;
+    perSource[srcId]! += 1;
   });
 
   const rows = balanced.map(toRow);
