@@ -144,7 +144,7 @@ export async function runSync(): Promise<SyncResult> {
   const supabase = createClient(supaUrl, serviceRole);
 
   const [rssResult, newsapi, guardian, gnews] = await Promise.all([
-    fetchAllRssNews(),
+    fetchAllRssNews().catch(() => ({ items: [], perSource: {}, failed: [] })),
     fetchNewsApi().catch(() => []),
     fetchGuardian().catch(() => []),
     fetchGnews().catch(() => []),
@@ -159,7 +159,6 @@ export async function runSync(): Promise<SyncResult> {
   };
   fetched.total = fetched.rss + fetched.newsapi + fetched.guardian + fetched.gnews;
 
-  // Modificato per accettare in modo sicuro sia .lang che .image_url nativi dello scraper Supabase
   const allItems: NewsItem[] = [...rssResult.items, ...newsapi, ...guardian, ...gnews]
     .filter(item => item && item.title && (item.lang || (item as any).lang) !== 'en') 
     .map(item => ({
@@ -194,10 +193,12 @@ export async function runSync(): Promise<SyncResult> {
 
   const rows = balanced.map(toRow);
   let upserted = 0;
+
   for (const batch of chunk(rows, 200)) {
     const { error, count } = await supabase
       .from('news_items')
       .upsert(batch as never, { onConflict: 'hash', count: 'exact', ignoreDuplicates: false });
+    
     if (error) {
       return {
         ok: false,
@@ -212,3 +213,32 @@ export async function runSync(): Promise<SyncResult> {
         failed: rssResult.failed,
         error: `upsert: ${error.message}`,
       };
+    }
+    upserted += count ?? batch.length;
+  }
+
+  const threshold = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  let deleted = 0;
+  try {
+    const { count } = await supabase
+      .from('news_items')
+      .delete({ count: 'exact' })
+      .lt('published_at', threshold);
+    deleted = count ?? 0;
+  } catch (err) {
+    console.warn('[sync] cleanup failed:', (err as Error).message);
+  }
+
+  return {
+    ok: true,
+    elapsed_ms: Date.now() - t0,
+    fetched,
+    after_dedup: deduped.length,
+    after_balance: balanced.length,
+    upserted,
+    deleted,
+    perSource,
+    perCategory,
+    failed: rssResult.failed,
+  };
+}
