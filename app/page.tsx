@@ -15,9 +15,11 @@ import { LiveStrip } from '@/components/layout/LiveStrip';
 import { SportShortcuts } from '@/components/shared/SportShortcuts';
 import { NewsCard } from '@/components/news/NewsCard';
 import { fetchLatestNews } from '@/lib/news/items';
-// 1. Importa la funzione di conversione dei match (adatta il nome se differisce nel tuo progetto)
-import { fetchLiveMatches, fetchMatchCountsByStatus, toLiveMatchData } from '@/lib/sports/matches';
+import { fetchLiveMatches, fetchMatchCountsByStatus } from '@/lib/sports/matches';
 import { toNewsCardData } from '@/lib/news/types';
+
+// Assicurati di adattare i percorsi di importazione se i tipi si trovano altrove nel tuo progetto
+import type { LiveMatch, MatchRow } from '@/lib/sports/types'; 
 
 export const revalidate = 120;
 
@@ -26,6 +28,25 @@ export const metadata = {
   description: 'Lo sguardo veloce al mondo sportivo: news, live, schedine.',
 };
 
+/**
+ * Funzione di adapter che trasforma i dati grezzi del match (MatchRow)
+ * nel formato richiesto dal componente d'interfaccia (LiveMatch).
+ * Allinea le discrepanze tra snake_case del DB e camelCase del frontend.
+ */
+function toLiveMatchData(row: MatchRow): LiveMatch {
+  return {
+    id: row.id,
+    status: row.status,
+    minute: row.minute ?? '',
+    // Mappatura flessibile per gestire sia snake_case che camelCase provenienti dalla sorgente dati
+    homeTeam: (row as any).home_team_name || (row as any).home_team || (row as any).homeTeam || 'Home',
+    awayTeam: (row as any).away_team_name || (row as any).away_team || (row as any).awayTeam || 'Away',
+    homeScore: (row as any).home_score ?? (row as any).homeScore ?? 0,
+    awayScore: (row as any).away_score ?? (row as any).awayScore ?? 0,
+    sport: row.sport || 'soccer',
+  };
+}
+
 export default async function HomePage() {
   const [heroRaw, liveMatchesRaw, counts] = await Promise.all([
     fetchLatestNews({ limit: 7 }),
@@ -33,15 +54,14 @@ export default async function HomePage() {
     fetchMatchCountsByStatus(),
   ]);
 
-  // Formattazione dati News
+  // Formattazione dei dati delle News
   const hero = (heroRaw || []).map((row: any) => toNewsCardData(row));
   const heroMain = hero[0];
   const heroSide = hero.slice(1, 3);
   const evidenza = hero.slice(3, 7);
 
-  // 2. Formattazione dati Live Matches per risolvere l'errore di compilazione
-  // Se toLiveMatchData non esiste nel tuo backend, vedi la nota in fondo per mapparlo a mano
-  const liveMatches = (liveMatchesRaw || []).map((match: any) => toLiveMatchData(match));
+  // Formattazione pulita e tipizzata dei Live Matches tramite la funzione di adapter
+  const liveMatches: LiveMatch[] = (liveMatchesRaw || []).map((row: MatchRow) => toLiveMatchData(row));
 
   return (
     <>
@@ -76,7 +96,7 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* LIVESTRIP - Ora riceve il tipo corretto LiveMatch[] */}
+        {/* LIVESTRIP — Riceve l'array perfettamente tipizzato LiveMatch[] */}
         <section className="mb-6">
           <LiveStrip matches={liveMatches} />
         </section>
