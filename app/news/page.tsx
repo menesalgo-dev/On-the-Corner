@@ -1,68 +1,81 @@
 /**
- * app/news/page.tsx — Archivio news
- *
- * Layout: filtri chips orizzontali sticky + lista compact NewsCard +
- * paginazione + CTA torna alla home.
- *
- * Schema snake_case allineato a NewsCard.
+ * app/news/page.tsx
+ * Feed completo news con filtri categoria + fonte + paginazione.
+ * Versione integrata: mantiene tutte le funzioni esistenti
+ * (fetchNewsPage, CategoryTabs, EmptyState, filtro fonti dinamico)
+ * e aggiunge breadcrumb home, paginazione, CTA torna alla home.
  */
 import Link from 'next/link';
-import { Search, ChevronLeft, Home as HomeIcon } from 'lucide-react';
+import { ChevronLeft, Home as HomeIcon } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { NewsCard } from '@/components/news/NewsCard';
-import { fetchNewsArchive, fetchCategoryCounts } from '@/lib/news/items';
-import { fetchMatchCountsByStatus } from '@/lib/sports/matches';
-import { toNewsCardData } from '@/lib/news/types';
-import { fetchUserBookmarkHashes } from '@/lib/news';
+import { CategoryTabs } from '@/components/news/CategoryTabs';
+import { EmptyState } from '@/components/shared/EmptyState';
+import {
+  fetchNewsPage,
+  fetchUserBookmarkIds,
+  fetchNewsStats,
+  fetchCategoryCounts,
+  fetchCategories,
+} from '@/lib/news';
 
-export const revalidate = 60;
+export const revalidate = 120;
+
+const PAGE_SIZE = 60;
 
 interface PageProps {
-  searchParams: Promise<{
-    category?: string;
-    source?: string;
-    page?: string;
-  }>;
+  searchParams: Promise<{ source?: string; category?: string; page?: string }>;
 }
-
-const PAGE_SIZE = 20;
 
 export async function generateMetadata({ searchParams }: PageProps) {
   const params = await searchParams;
-  const cat = params.category;
+  const cat = params.category && params.category !== 'all' ? params.category : undefined;
   return {
-    title: cat ? `News ${cat} — On The Corner` : 'Archivio news sportive',
-    description: 'Tutte le notizie sportive aggiornate ogni 30 minuti.',
+    title: cat ? `News ${cat} — On The Corner` : 'Tutte le notizie sportive',
+    description: 'Notizie aggregate da 21 fonti italiane e internazionali.',
   };
 }
 
 export default async function NewsPage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const activeSource = params.source && params.source !== 'all' ? params.source : undefined;
+  const activeCategory = params.category && params.category !== 'all' ? params.category : undefined;
   const page = Math.max(1, parseInt(params.page ?? '1') || 1);
-  const category = params.category;
-  const sourceId = params.source;
+  const offset = (page - 1) * PAGE_SIZE;
 
-  const [itemsRaw, total, categoryCounts, matchCounts, bookmarkHashes] = await Promise.all([
-    fetchNewsArchive({ page, pageSize: PAGE_SIZE, categoryId: category, sourceId }),
-    fetchNewsArchive({ countOnly: true, categoryId: category, sourceId }),
+  const [news, bookmarks, stats, counts, cats] = await Promise.all([
+    fetchNewsPage({
+      limit: PAGE_SIZE,
+      offset,
+      sourceId: activeSource,
+      categoryId: activeCategory,
+    } as any),
+    fetchUserBookmarkIds(),
+    fetchNewsStats(),
     fetchCategoryCounts(),
-    fetchMatchCountsByStatus(),
-    fetchUserBookmarkHashes(),
+    fetchCategories(),
   ]);
 
-  const items = Array.isArray(itemsRaw)
-    ? itemsRaw.map((r: any) => toNewsCardData(r))
-    : [];
-  const totalCount = typeof total === 'number' ? total : 0;
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const tabs = cats.map((c) => ({
+    id: c.id,
+    name: c.short_name ?? c.name,
+    emoji: c.emoji ?? undefined,
+    count: counts.get(c.id) ?? 0,
+  }));
+
+  // Calcolo totale per paginazione: usa il count della categoria attiva, o somma di tutti
+  const totalForActive = activeCategory
+    ? (counts.get(activeCategory) ?? 0)
+    : Array.from(counts.values()).reduce((s, n) => s + n, 0);
+  const totalPages = Math.max(1, Math.ceil(totalForActive / PAGE_SIZE));
 
   return (
     <>
       <Header />
 
-      <main className="mx-auto max-w-[1100px] px-4 pb-24 pt-4 sm:px-6 sm:pb-12 sm:pt-6">
+      <main className="mx-auto max-w-[1320px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12">
         {/* Breadcrumb */}
         <nav className="mb-3 flex items-center gap-2 text-xs">
           <Link
@@ -81,46 +94,81 @@ export default async function NewsPage({ searchParams }: PageProps) {
           </span>
         </nav>
 
-        {/* Header */}
+        {/* Header con titolo dinamico */}
         <header className="mb-4 flex items-baseline justify-between">
           <div>
             <h1
               className="text-2xl uppercase tracking-tight sm:text-4xl"
               style={{ fontFamily: 'var(--font-archivo-black)' }}
             >
-              {category ?? 'Tutte'}<span className="text-[#e8c800]">.</span>
+              {activeCategory ? activeCategory : 'Notizie'}<span className="text-[#e8c800]">.</span>
             </h1>
             <p
               className="mt-1 text-[10px] uppercase tracking-widest text-zinc-500"
               style={{ fontFamily: 'var(--font-dm-mono)' }}
             >
-              {totalCount} articoli · pagina {page}/{totalPages}
+              {news.length} su {totalForActive} · pagina {page}/{totalPages}
             </p>
           </div>
+          <span
+            className="hidden text-xs uppercase tracking-widest text-zinc-500 sm:inline"
+            style={{ fontFamily: 'var(--font-dm-mono)' }}
+          >
+            {news.length} risultati
+          </span>
         </header>
 
-        {/* Filtri categoria */}
-        <CategoryFilter activeCategory={category} categoryCounts={categoryCounts} />
+        {/* Tabs categorie */}
+        <CategoryTabs tabs={tabs} activeId={activeCategory} basePath="/news" />
 
-        {/* Lista */}
-        {items.length === 0 ? (
-          <EmptyResults />
-        ) : (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {items.map((n) => (
-              <NewsCard
-                key={n.id}
-                news={n}
-                isBookmarked={bookmarkHashes.has(n.id)}
-                variant="compact"
+        {/* Filtro fonti */}
+        <nav className="mb-6 flex gap-2 overflow-x-auto scrollbar-hide">
+          <FilterChip
+            href={`/news${activeCategory ? `?category=${activeCategory}` : ''}`}
+            label="Tutte fonti"
+            active={!activeSource}
+          />
+          {stats.sources.slice(0, 15).map((s) => {
+            const sp = new URLSearchParams();
+            if (activeCategory) sp.set('category', activeCategory);
+            sp.set('source', s.id);
+            return (
+              <FilterChip
+                key={s.id}
+                href={`/news?${sp.toString()}`}
+                label={s.name}
+                count={s.count}
+                active={activeSource === s.id}
               />
+            );
+          })}
+        </nav>
+
+        {/* Lista o empty */}
+        {news.length === 0 ? (
+          <EmptyState
+            emoji="🔍"
+            title="Nessuna notizia"
+            description="Nessun risultato per i filtri attivi."
+            actionLabel="Reset filtri"
+            actionHref="/news"
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {news.map((item) => (
+              <NewsCard key={item.id} news={item} isBookmarked={bookmarks.has(item.id)} />
             ))}
           </div>
         )}
 
         {/* Paginazione */}
         {totalPages > 1 && (
-          <Pagination page={page} totalPages={totalPages} category={category} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            category={activeCategory}
+            source={activeSource}
+          />
         )}
 
         {/* CTA torna alla home */}
@@ -135,65 +183,49 @@ export default async function NewsPage({ searchParams }: PageProps) {
       </main>
 
       <Footer />
-      <BottomNav liveCount={matchCounts.live} />
+      <BottomNav />
     </>
   );
 }
 
-function CategoryFilter({
-  activeCategory, categoryCounts,
-}: { activeCategory?: string; categoryCounts: Record<string, number> }) {
-  const cats: { id: string | undefined; label: string }[] = [
-    { id: undefined, label: 'Tutte' },
-    { id: 'calcio', label: '⚽ Calcio' },
-    { id: 'champions', label: '🏆 Champions' },
-    { id: 'f1', label: '🏎️ F1' },
-    { id: 'motogp', label: '🏍️ MotoGP' },
-    { id: 'tennis', label: '🎾 Tennis' },
-    { id: 'nfl', label: '🏈 NFL' },
-    { id: 'fantacalcio', label: '🎮 Fanta' },
-    { id: 'altro', label: '📰 Altro' },
-  ];
-
+function FilterChip({
+  href, label, count, active,
+}: { href: string; label: string; count?: number; active: boolean }) {
   return (
-    <nav className="mb-5 -mx-4 flex gap-2 overflow-x-auto px-4 scrollbar-hide sm:mx-0 sm:px-0">
-      {cats.map((c) => {
-        const active = c.id === activeCategory;
-        const count = c.id
-          ? (categoryCounts[c.id] ?? 0)
-          : Object.values(categoryCounts).reduce((s, n) => s + n, 0);
-        return (
-          <Link
-            key={c.id ?? 'all'}
-            href={c.id ? `/news?category=${c.id}` : '/news'}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition ${
-              active
-                ? 'border-[#e8c800] bg-[#e8c800] text-black'
-                : 'border-[#1f1f1f] bg-[#0d0d0d] text-zinc-400 hover:border-[#e8c800]/40 hover:text-[#e8c800]'
-            }`}
-          >
-            {c.label}
-            {count > 0 && (
-              <span className={`ml-1.5 ${active ? 'text-black/60' : 'text-zinc-600'}`}>
-                {count}
-              </span>
-            )}
-          </Link>
-        );
-      })}
-    </nav>
+    <Link
+      href={href}
+      className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
+        active
+          ? 'border-[#e8c800] bg-[#e8c800] text-black'
+          : 'border-[#1f1f1f] bg-[#0d0d0d] text-zinc-400 hover:border-[#e8c800]/40 hover:text-[#e8c800]'
+      }`}
+    >
+      {label}
+      {count !== undefined && !active && (
+        <span className="ml-1.5 text-[10px] text-zinc-600" style={{ fontFamily: 'var(--font-dm-mono)' }}>
+          {count}
+        </span>
+      )}
+    </Link>
   );
 }
 
 function Pagination({
-  page, totalPages, category,
-}: { page: number; totalPages: number; category?: string }) {
-  const baseQs = category ? `category=${category}&` : '';
-  const prevHref = page > 1 ? `/news?${baseQs}page=${page - 1}` : null;
-  const nextHref = page < totalPages ? `/news?${baseQs}page=${page + 1}` : null;
+  page, totalPages, category, source,
+}: { page: number; totalPages: number; category?: string; source?: string }) {
+  const buildHref = (p: number) => {
+    const sp = new URLSearchParams();
+    if (category) sp.set('category', category);
+    if (source) sp.set('source', source);
+    sp.set('page', String(p));
+    return `/news?${sp.toString()}`;
+  };
+
+  const prevHref = page > 1 ? buildHref(page - 1) : null;
+  const nextHref = page < totalPages ? buildHref(page + 1) : null;
 
   return (
-    <nav className="mt-6 flex items-center justify-center gap-2">
+    <nav className="mt-8 flex items-center justify-center gap-2">
       {prevHref ? (
         <Link
           href={prevHref}
@@ -227,26 +259,5 @@ function Pagination({
         </span>
       )}
     </nav>
-  );
-}
-
-function EmptyResults() {
-  return (
-    <div className="rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] p-10 text-center">
-      <Search className="mx-auto h-8 w-8 text-zinc-600" />
-      <h2 className="mt-3 text-lg uppercase text-white" style={{ fontFamily: 'var(--font-archivo-black)' }}>
-        Nessuna notizia
-      </h2>
-      <p className="mt-1 text-sm text-zinc-400">
-        Per questa categoria non ci sono articoli recenti.
-      </p>
-      <Link
-        href="/news"
-        className="mt-4 inline-block rounded-lg bg-[#e8c800] px-4 py-2 text-xs uppercase tracking-wider text-black"
-        style={{ fontFamily: 'var(--font-archivo-black)' }}
-      >
-        Vedi tutte
-      </Link>
-    </div>
   );
 }
