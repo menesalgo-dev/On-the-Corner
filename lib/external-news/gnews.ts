@@ -69,7 +69,7 @@ export async function fetchGnews(): Promise<NewsItem[]> {
       // Mappatura convertita da camelCase a snake_case per combaciare con l'interfaccia NewsItemRow del DB
       items.push({
         hash,
-        sourceid: `gnews_${a.source.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+        sourceId: `gnews_${a.source.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
         source_name: a.source.name,
         title: a.title,
         link,
