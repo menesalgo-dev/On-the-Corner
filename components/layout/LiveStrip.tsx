@@ -1,8 +1,8 @@
 /**
  * components/layout/LiveStrip.tsx
- * Versione ottimizzata per snake_case dal database
+ * Strip orizzontale match live. Placeholder per W4 (API sport).
+ * Per ora mostra messaggio "Live in arrivo" se non ci sono match.
  */
-import React from 'react';
 import Link from 'next/link';
 import { Radio } from 'lucide-react';
 
@@ -18,32 +18,23 @@ interface LiveMatch {
 }
 
 interface Props {
-  matches?: any[];   // Accetta qualsiasi formato (snake_case o camelCase)
+  matches?: LiveMatch[];
 }
 
 export function LiveStrip({ matches = [] }: Props) {
-  
-  // Normalizzazione leggera per snake_case
-  const normalized = matches.map((m: any) => ({
-    id: m.id,
-    sport: m.sport || m.sport_type || 'calcio',
-    homeTeam: m.home_team || m.homeTeam || 'Squadra',
-    awayTeam: m.away_team || m.awayTeam,
-    homeScore: m.home_score !== undefined ? m.home_score : m.homeScore,
-    awayScore: m.away_score !== undefined ? m.away_score : m.awayScore,
-    minute: m.minute || m.current_minute,
-    status: m.status || 'live',
-  }));
-
-  if (normalized.length === 0) {
+  // Se non ci sono match passati, mostra placeholder informativo
+  if (matches.length === 0) {
     return (
-      <section className="rounded-xl border border-otc-line bg-otc-surface p-3.5">
+      <section className="rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] p-4">
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse-dot" />
-          <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">
+          <span
+            className="inline-flex h-2 w-2 rounded-full bg-red-500"
+            style={{ animation: 'pulse-dot 1.6s ease-in-out infinite' }}
+          />
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500" style={{ fontFamily: 'var(--font-dm-mono)' }}>
             Live ora
           </span>
-          <span className="ml-auto text-xs text-zinc-500 tracking-tight">
+          <span className="ml-auto text-xs text-zinc-500">
             Match live in arrivo nelle prossime settimane
           </span>
         </div>
@@ -52,46 +43,51 @@ export function LiveStrip({ matches = [] }: Props) {
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-otc-line bg-otc-surface">
-      <header className="flex items-center justify-between border-b border-otc-line px-4 py-2 bg-otc-bg/40">
+    <section className="overflow-hidden rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d]">
+      <header className="flex items-center justify-between border-b border-[#1f1f1f] px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <Radio className="h-3.5 w-3.5 text-red-500 animate-pulse-dot" />
-          <span className="text-[10px] uppercase tracking-widest text-zinc-200 font-bold">
+          <Radio className="h-4 w-4 text-red-500" style={{ animation: 'pulse-dot 1.6s ease-in-out infinite' }} />
+          <span className="text-[11px] uppercase tracking-widest text-white" style={{ fontFamily: 'var(--font-archivo-black)' }}>
             Live ora
           </span>
-          <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-400">
-            {normalized.length}
+          <span className="rounded-md bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-400">
+            {matches.length}
           </span>
         </div>
         <Link
           href="/live"
-          className="text-[9px] font-mono uppercase tracking-wider text-zinc-500 transition hover:text-otc-accent"
+          className="text-[10px] uppercase tracking-widest text-zinc-400 transition hover:text-[#e8c800]"
+          style={{ fontFamily: 'var(--font-dm-mono)' }}
         >
-          Vedi Tutti →
+          Tutti →
         </Link>
       </header>
 
-      <div className="flex gap-2 overflow-x-auto p-2.5 scrollbar-none bg-[#050507]">
-        {normalized.map((m) => (
+      <div className="flex gap-2 overflow-x-auto p-3 scrollbar-hide">
+        {matches.map((m) => (
           <Link
             key={m.id}
             href={`/live/${m.id}`}
-            className="flex shrink-0 items-center gap-3 rounded-lg border border-otc-line bg-otc-surface px-3 py-1.5 transition hover:border-otc-accent/30"
+            className="flex shrink-0 items-center gap-3 rounded-xl border border-[#1f1f1f] bg-[#141414] px-3 py-2 transition hover:border-[#e8c800]/40"
           >
-            <span className="rounded bg-otc-accent/10 px-1.5 py-0.5 text-[8px] font-mono font-bold uppercase tracking-wider text-otc-accent">
+            <span className="rounded bg-[#e8c800]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#e8c800]">
               {m.sport}
             </span>
-            <span className="text-xs text-zinc-200 font-medium tracking-tight">{m.homeTeam}</span>
-            
+            <span className="text-sm text-white">{m.homeTeam}</span>
             {m.homeScore !== undefined && (
-              <span className="font-mono text-xs font-bold text-zinc-100 bg-otc-line px-1.5 py-0.5 rounded">
+              <span className="font-bold text-white" style={{ fontFamily: 'var(--font-dm-mono)' }}>
                 {m.homeScore}–{m.awayScore}
               </span>
             )}
-            
-            {m.awayTeam && (
-              <span className="text-xs text-zinc-200 font-medium tracking-tight">{m.awayTeam}</span>
-            )}
-            
+            {m.awayTeam && <span className="text-sm text-white">{m.awayTeam}</span>}
             {m.minute && (
-              <span className="text-[10px] font-mono text-otc-accent font-semibold animate-pulse-dot">
+              <span className="text-[11px] text-[#e8c800]" style={{ fontFamily: 'var(--font-dm-mono)' }}>
+                {m.minute}
+              </span>
+            )}
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
