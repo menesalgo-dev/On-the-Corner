@@ -4,7 +4,8 @@
  * Registrati su https://gnews.io/register
  */
 import { categorize } from '@/lib/rss/categorize';
-import { type NewsItem, normalizeTitle, normalizeUrl, sha1 } from '@/lib/news/types';
+// Importiamo NewsItemRow al posto di NewsItem che non esiste più
+import { type NewsItemRow, normalizeTitle, normalizeUrl, sha1 } from '@/lib/news/types';
 
 interface GnewsArticle {
   title: string;
@@ -21,7 +22,8 @@ interface GnewsResponse {
   articles: GnewsArticle[];
 }
 
-export async function fetchGnews(): Promise<NewsItem[]> {
+// Cambiamo il tipo di ritorno della Promise in NewsItemRow[]
+export async function fetchGnews(): Promise<NewsItemRow[]> {
   const apiKey = process.env.GNEWS_API_KEY;
   if (!apiKey) {
     console.warn('[gnews] GNEWS_API_KEY mancante, skip');
@@ -37,7 +39,8 @@ export async function fetchGnews(): Promise<NewsItem[]> {
     urls.map((u) => fetch(u, { cache: 'no-store', headers: { 'User-Agent': 'OnTheCornerBot/1.0' } })),
   );
 
-  const items: NewsItem[] = [];
+  // Array tipizzato correttamente in NewsItemRow[]
+  const items: NewsItemRow[] = [];
   const now = Date.now();
 
   for (let i = 0; i < results.length; i++) {
@@ -63,19 +66,22 @@ export async function fetchGnews(): Promise<NewsItem[]> {
       const description = (a.description ?? '').slice(0, 600);
       const categoryId = categorize({ forceCat: undefined }, a.title, description);
 
+      // Mappatura convertita da camelCase a snake_case per combaciare con l'interfaccia NewsItemRow del DB
       items.push({
+        id: hash, // Forniamo un id (usando l'hash univoco o stringa vuota a seconda del bisogno)
         hash,
-        sourceId: `gnews_${a.source.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-        sourceName: a.source.name,
+        source_id: `gnews_${a.source.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+        source_name: a.source.name,
         title: a.title,
         link,
         description,
-        imageUrl: a.image,
+        image_url: a.image,
         lang,
         priority: lang === 'it' ? 1 : 2,
-        publishedAt: new Date(ts).toISOString(),
+        published_at: new Date(ts).toISOString(),
         tags: ['gnews'],
-        categoryId,
+        category_id: categoryId,
+        created_at: new Date(now).toISOString(),
       });
     }
   }
