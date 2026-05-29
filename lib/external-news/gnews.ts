@@ -80,7 +80,6 @@ export async function fetchGnews(): Promise<NewsItem[]> {
         publishedAt: new Date(ts).toISOString(),
         tags: ['gnews'],
         categoryId: categoryId,
-        createdAt: new Date(now).toISOString(),
       });
     }
   }
