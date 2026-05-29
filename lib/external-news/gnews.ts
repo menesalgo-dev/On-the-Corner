@@ -70,7 +70,7 @@ export async function fetchGnews(): Promise<NewsItem[]> {
       items.push({
         hash,
         sourceId: `gnews_${a.source.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-        sourcename: a.source.name,
+        sourceName: a.source.name,
         title: a.title,
         link,
         description,
