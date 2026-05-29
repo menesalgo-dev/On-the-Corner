@@ -4,10 +4,10 @@
  */
 import 'server-only'
 import { createClient } from '@/lib/supabase/server'
-import type { NewsItemRow } from './types'
+import type { NewsItem } from './types'
 
 /** Ultime news per home (compact). */
-export async function fetchLatestNews(opts: { limit?: number; categoryId?: string } = {}): Promise<NewsItemRow[]> {
+export async function fetchLatestNews(opts: { limit?: number; categoryId?: string } = {}): Promise<NewsItem[]> {
   const { limit = 8, categoryId } = opts
   const supabase = await createClient()
   let q = supabase
@@ -17,7 +17,7 @@ export async function fetchLatestNews(opts: { limit?: number; categoryId?: strin
     .limit(limit)
   if (categoryId) q = q.eq('category_id', categoryId)
   const { data } = await q
-  return (data ?? []) as NewsItemRow[]
+  return (data ?? []) as NewsItem[]
 }
 
 /** Archivio paginato per pagina /news. */
@@ -27,7 +27,7 @@ export async function fetchNewsArchive(opts: {
   categoryId?: string
   sourceId?: string
   countOnly?: true
-}): Promise<NewsItemRow[] | number> {
+}): Promise<NewsItem[] | number> {
   const { page = 1, pageSize = 20, categoryId, sourceId, countOnly } = opts
   const supabase = await createClient()
 
@@ -48,7 +48,7 @@ export async function fetchNewsArchive(opts: {
   if (categoryId) q = q.eq('category_id', categoryId)
   if (sourceId) q = q.eq('source_id', sourceId)
   const { data } = await q
-  return (data ?? []) as NewsItemRow[]
+  return (data ?? []) as NewsItem[]
 }
 
 /** Conteggio articoli per categoria (per filtro chips). */
