@@ -1,7 +1,7 @@
 /**
  * components/news/NewsCard.tsx
  * Card notizia Premium Minimal - Varianti: hero, default, compact.
- * Schema snake_case allineato al resto del progetto.
+ * Ottimizzato: Sinossi estese ad alta densità informativa e integrazione token otc.
  */
 import React from 'react';
 import Link from 'next/link';
@@ -9,7 +9,19 @@ import Image from 'next/image';
 import { Bookmark, ArrowUpRight } from 'lucide-react';
 import { BookmarkButton } from './BookmarkButton';
 import { formatRelative } from '@/lib/utils';
-import type { NewsCardData } from '@/lib/news/types';
+
+export interface NewsCardData {
+  id: string;
+  title: string;
+  link: string;
+  description: string | null;
+  image_url: string | null;
+  source_name: string;
+  published_at: string;
+  category_id?: string | null;
+  category_name?: string | null;
+  category_emoji?: string | null;
+}
 
 interface Props {
   news: NewsCardData;
@@ -60,12 +72,13 @@ function HeroVariant({ news, isBookmarked }: InternalProps) {
             )}
             <span suppressHydrationWarning>{formatRelative(news.published_at)}</span>
           </div>
-          <h2
+          <h2 
             className="text-xl font-bold tracking-tight text-zinc-100 sm:text-2xl lg:text-3xl max-w-4xl group-hover:text-otc-accent transition-colors duration-200 uppercase leading-[1.05]"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             {news.title}
           </h2>
+          {/* 📝 SINOSSI HERO ESTESA: Allungata a 4 righe dense per massima informazione */}
           {news.description && (
             <p className="mt-2 line-clamp-4 max-w-3xl text-xs text-zinc-400 leading-relaxed font-normal">
               {news.description}
@@ -104,12 +117,13 @@ function DefaultVariant({ news, isBookmarked }: InternalProps) {
             <span>•</span>
             <span suppressHydrationWarning>{formatRelative(news.published_at)}</span>
           </div>
-          <h3
+          <h3 
             className="line-clamp-2 text-sm font-bold uppercase leading-tight tracking-tight text-zinc-200 group-hover:text-otc-accent transition-colors duration-200 mb-2.5"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             {news.title}
           </h3>
+          {/* 📝 SINOSSI DEFAULT INSERITA: Mostra fino a 3 righe per arricchire la visualizzazione */}
           {news.description && (
             <p className="line-clamp-3 text-xs text-zinc-500 leading-relaxed font-normal">
               {news.description}
@@ -117,6 +131,7 @@ function DefaultVariant({ news, isBookmarked }: InternalProps) {
           )}
         </div>
       </Link>
+      {/* 🛠️ NUOVA POSIZIONE TASTO SEGNALIBRI: Spostato in basso a destra per pulizia visiva */}
       <div className="flex items-center justify-between border-t border-otc-line px-4 py-2.5 bg-[#050507] mt-auto">
         <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">
           {news.category_name || 'Sport'}
@@ -135,13 +150,13 @@ function CompactVariant({ news }: InternalProps) {
       <Link href={`/news/${news.id}`} prefetch={false} className="flex flex-1 gap-3 items-center">
         <div className="relative h-11 w-14 shrink-0 overflow-hidden rounded bg-otc-bg border border-otc-line">
           {news.image_url ? (
-            <Image
-              src={news.image_url}
-              alt=""
-              fill
-              sizes="56px"
-              className="object-cover opacity-85"
-              unoptimized
+            <Image 
+              src={news.image_url} 
+              alt="" 
+              fill 
+              sizes="56px" 
+              className="object-cover opacity-85" 
+              unoptimized 
             />
           ) : (
             <FallbackThumb compact />
