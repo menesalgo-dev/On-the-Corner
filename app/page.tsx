@@ -9,7 +9,7 @@ import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Ticker } from '@/components/layout/Ticker';
 import { LiveStrip } from '@/components/layout/LiveStrip';
-import { NewsCard, NewsCardSkeleton } from '@/components/news/NewsCard';
+import { NewsCard } from '@/components/news/NewsCard';
 import { CategoryTabs } from '@/components/news/CategoryTabs';
 import { EmptyState } from '@/components/shared/EmptyState';
 import {
