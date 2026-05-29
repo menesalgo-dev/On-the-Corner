@@ -11,6 +11,7 @@ import { Search, ChevronLeft, Home as HomeIcon } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { NewsCard } from '@/components/news/NewsCard';
 import { fetchNewsArchive, fetchCategoryCounts } from '@/lib/news/items';
 import { fetchMatchCountsByStatus } from '@/lib/sports/matches';
 import { toNewsCardData } from '@/lib/news/types';
