@@ -11,15 +11,13 @@ import { ArrowRight, Radio, Newspaper } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { LiveStrip } from '@/components/layout/LiveStrip';
+// Importiamo il componente e il suo tipo ufficiale appena esportato
+import { LiveStrip, type LiveMatch } from '@/components/layout/LiveStrip';
 import { SportShortcuts } from '@/components/shared/SportShortcuts';
 import { NewsCard } from '@/components/news/NewsCard';
 import { fetchLatestNews } from '@/lib/news/items';
 import { fetchLiveMatches, fetchMatchCountsByStatus } from '@/lib/sports/matches';
 import { toNewsCardData } from '@/lib/news/types';
-
-// Estraiamo dinamicamente il tipo del singolo match accettato dalle props di LiveStrip
-type LiveMatchFromComponent = React.ComponentProps<typeof LiveStrip>['matches'][number];
 
 export const revalidate = 120;
 
@@ -29,19 +27,19 @@ export const metadata = {
 };
 
 /**
- * Funzione di adapter che trasforma i dati grezzi del match (MatchRow / any)
- * nel formato esatto richiesto dal componente d'interfaccia LiveStrip.
+ * Funzione adapter che trasforma il record grezzo del DB (MatchRow / any)
+ * nell'oggetto tipizzato e validato richiesto dall'interfaccia LiveMatch.
  */
-function toLiveMatchData(row: any): LiveMatchFromComponent {
+function toLiveMatchData(row: any): LiveMatch {
   return {
-    id: row.id,
-    status: row.status,
+    id: String(row.id),
+    status: row.status || 'scheduled',
     minute: row.minute ?? '',
-    // Mappatura flessibile per gestire sia snake_case che camelCase provenienti dalla sorgente dati
+    // Fallback flessibile per mappare sia camelCase che snake_case (es: database PostgreSQL)
     homeTeam: row.homeTeam || row.home_team || row.home_team_name || 'Home',
     awayTeam: row.awayTeam || row.away_team || row.away_team_name || 'Away',
-    homeScore: row.homeScore ?? row.home_score ?? 0,
-    awayScore: row.awayScore ?? row.away_score ?? 0,
+    homeScore: row.homeScore ?? row.home_score ?? undefined,
+    awayScore: row.awayScore ?? row.away_score ?? undefined,
     sport: row.sport || 'soccer',
   };
 }
@@ -59,8 +57,8 @@ export default async function HomePage() {
   const heroSide = hero.slice(1, 3);
   const evidenza = hero.slice(3, 7);
 
-  // Formattazione pulita e tipizzata dei Live Matches tramite la funzione di adapter
-  const liveMatches = (liveMatchesRaw || []).map((row: any) => toLiveMatchData(row));
+  // Formattazione solida e tipizzata dei Live Matches
+  const liveMatches: LiveMatch[] = (liveMatchesRaw || []).map((row: any) => toLiveMatchData(row));
 
   return (
     <>
@@ -95,7 +93,7 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* LIVESTRIP — Ora riceve l'array perfettamente tipizzato ricavato dal componente stesso */}
+        {/* LIVESTRIP — Riceve dati puliti e con contratti TypeScript rispettati al 100% */}
         <section className="mb-6">
           <LiveStrip matches={liveMatches} />
         </section>
