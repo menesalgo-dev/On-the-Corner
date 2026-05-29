@@ -1,15 +1,8 @@
 /**
  * lib/news/types.ts
  * Tipi strutturati flessibili per garantire la tolleranza totale tra snake_case e camelCase.
- * Fa da ponte (re-export) verso `@/lib/utils` per mantenere intatti gli import del progetto.
+ * Contiene le utility di normalizzazione integrate per evitare dipendenze incrociate.
  */
-import { 
-  similarity as utilSimilarity, 
-  stripHtml as utilStripHtml, 
-  normalizeTitle as utilNormalizeTitle, 
-  normalizeUrl as utilNormalizeUrl, 
-  sha1 as utilSha1 
-} from '@/lib/utils';
 
 /** Struttura base rigida del DB news_items (Postgres standard) */
 export interface BaseNewsItemRow {
@@ -63,34 +56,26 @@ export type NewsItem = NewsItemRow;
 
 /**
  * Dati flessibili passati ai componenti d'interfaccia (NewsCard, Detail Page, ecc.)
- * Supporta sia lo standard snake_case che il vecchio camelCase per evitare conflitti nella UI.
  */
 export interface NewsCardData {
   id: string;
   title: string;
   link: string;
   description: string | null;
-  
-  // Standard UI (Doppio supporto snake_case e camelCase)
   image_url: string | null;
   imageUrl?: string | null;
-  
   source_name: string;
   sourceName?: string;
-  
   published_at: string;
   publishedAt?: string;
-  
   category_id?: string | null;
   categoryId?: string | null;
-  
   category_name?: string | null;
   category_emoji?: string | null;
 }
 
 /**
- * Adapter — Mappa i dati in modo intelligente popolando ENTRAMBI i formati (snake e camel),
- * così qualsiasi componente UI funzionerà istantaneamente a prescindere da cosa stampi a video.
+ * Adapter — Mappa i dati in modo intelligente popolando ENTRAMBI i formati (snake e camel).
  */
 export function toNewsCardData(row: any): NewsCardData {
   const img = row.image_url || row.imageUrl || null;
@@ -106,7 +91,6 @@ export function toNewsCardData(row: any): NewsCardData {
     category_name: row.category_name ?? null,
     category_emoji: row.category_emoji ?? null,
     
-    // Popoliamo sia le chiavi snake_case che camelCase per garantire compatibilità totale
     image_url: img,
     imageUrl: img,
     source_name: src,
@@ -119,11 +103,73 @@ export function toNewsCardData(row: any): NewsCardData {
 }
 
 /* ==========================================================================
-   PONTE DI ESPORTAZIONE VERSO UTILS (Risolve gli import di gnews, parser, run-sync)
+   UTILITIES DI NORMALIZZAZIONE INTEGRATE (Risolve definitivamente run-sync, gnews, parser)
    ========================================================================== */
 
-export const similarity = utilSimilarity;
-export const stripHtml = utilStripHtml;
-export const normalizeTitle = utilNormalizeTitle;
-export const normalizeUrl = utilNormalizeUrl;
-export const sha1 = utilSha1;
+export function similarity(s1: string, s2: string): number {
+  if (!s1 || !s2) return 0;
+  const str1 = s1.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const str2 = s2.toLowerCase().replace(/[^a-z0-9]/g, '');
+  
+  if (str1 === str2) return 1;
+  if (str1.length < 2 || str2.length < 2) return 0;
+
+  const bigrams1 = new Map<string, number>();
+  for (let i = 0; i < str1.length - 1; i++) {
+    const bigram = str1.substr(i, 2);
+    bigrams1.set(bigram, (bigrams1.get(bigram) || 0) + 1);
+  }
+
+  let intersection = 0;
+  for (let i = 0; i < str2.length - 1; i++) {
+    const bigram = str2.substr(i, 2);
+    const count = bigrams1.get(bigram) || 0;
+    if (count > 0) {
+      bigrams1.set(bigram, count - 1);
+      intersection++;
+    }
+  }
+
+  return (2.0 * intersection) / (str1.length + str2.length - 2);
+}
+
+export function stripHtml(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim();
+}
+
+export function normalizeTitle(title: string): string {
+  if (!title) return '';
+  return title.trim().replace(/\s+/g, ' ');
+}
+
+export function normalizeUrl(url: string): string {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`.toLowerCase().replace(/\/$/, '');
+  } catch {
+    return url.trim().toLowerCase().replace(/\/$/, '');
+  }
+}
+
+export function sha1(str: string): string {
+  try {
+    const crypto = require('crypto');
+    return crypto.createHash('sha1').update(str).digest('hex');
+  } catch {
+    let block1 = 0, block2 = 0;
+    for (let i = 0; i < str.length; i++) {
+      const ch = str.charCodeAt(i);
+      block1 = (block1 * 31 + ch) | 0;
+      block2 = (block2 * 37 + ch) | 0;
+    }
+    return Math.abs(block1).toString(16) + Math.abs(block2).toString(16);
+  }
+}
