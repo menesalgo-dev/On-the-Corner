@@ -1,8 +1,15 @@
 /**
  * lib/news/types.ts
  * Tipi strutturati flessibili per garantire la tolleranza totale tra snake_case e camelCase.
- * Risolve gli errori di type-checking nei moduli esterni (gnews, parser, run-sync) fungendo da adapter.
+ * Fa da ponte (re-export) verso `@/lib/utils` per mantenere intatti gli import del progetto.
  */
+import { 
+  similarity as utilSimilarity, 
+  stripHtml as utilStripHtml, 
+  normalizeTitle as utilNormalizeTitle, 
+  normalizeUrl as utilNormalizeUrl, 
+  sha1 as utilSha1 
+} from '@/lib/utils';
 
 /** Struttura base rigida del DB news_items (Postgres standard) */
 export interface BaseNewsItemRow {
@@ -15,7 +22,7 @@ export interface BaseNewsItemRow {
   description: string | null;
   image_url: string | null;
   lang: string;
-  priority: number | null;
+  priority: number; // Forzato numerico per evitare errori logici e NaN nei cicli .sort()
   published_at: string;
   tags: string[] | null;
   category_id: string;
@@ -25,32 +32,32 @@ export interface BaseNewsItemRow {
 }
 
 /**
- * Estensione con i campi camelCase alternativi usati dai vecchi script e scraper esterni.
- * Rendiamo i campi non bloccanti usando Partial, permettendo a tutti i moduli di compilare.
+ * Estensione combinata con i campi camelCase alternativi.
+ * Il Partial permette agli oggetti incompleti degli scraper (es. gnews.ts) di compilare senza errori.
  */
-export type NewsItemRow = Partial<BaseNewsItemRow> & {
+export type NewsItemRow = Partial<Omit<BaseNewsItemRow, 'priority'>> & {
   hash: string;
   title: string;
   link: string;
+  priority: number; 
 } & Partial<{
   id: string;
   sourceId: string | null;
   sourceName: string | null;
   imageUrl: string | null;
-  publishedAt: string | null;
+  publishedAt: string; 
   categoryId: string | null;
   lang: string;
-  priority: number | null;
   tags: string[] | null;
 }>;
 
 /**
- * Alias di tipo per mantenere la retrocompatibilità con i moduli esterni.
+ * Alias di tipo per mantenere la piena retrocompatibilità.
  */
 export type NewsItem = NewsItemRow;
 
 /**
- * Dati rigidi passati ai componenti card della UI (NewsCard, ecc.)
+ * Dati rigidi passati ai componenti d'interfaccia (NewsCard, ecc.)
  */
 export interface NewsCardData {
   id: string;
@@ -85,81 +92,11 @@ export function toNewsCardData(row: NewsItemRow): NewsCardData {
 }
 
 /* ==========================================================================
-   UTILITIES DI NORMALIZZAZIONE E PARSING (Richieste dai moduli esterni)
+   PONTE DI ESPORTAZIONE VERSO UTILS (Risolve gli import di gnews, parser, run-sync)
    ========================================================================== */
 
-/**
- * Calcola l'indice di somiglianza (Sørensen–Dice coefficient) tra due stringhe.
- * Restituisce un valore da 0 (completamente diverse) a 1 (identiche).
- * Utilizzato da run-sync.ts per il de-duplicare le notizie in ingresso.
- */
-export function similarity(s1: string, s2: string): number {
-  if (!s1 || !s2) return 0;
-  const str1 = s1.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const str2 = s2.toLowerCase().replace(/[^a-z0-9]/g, '');
-  
-  if (str1 === str2) return 1;
-  if (str1.length < 2 || str2.length < 2) return 0;
-
-  const bigrams1 = new Map<string, number>();
-  for (let i = 0; i < str1.length - 1; i++) {
-    const bigram = str1.substr(i, 2);
-    bigrams1.set(bigram, (bigrams1.get(bigram) || 0) + 1);
-  }
-
-  let intersection = 0;
-  for (let i = 0; i < str2.length - 1; i++) {
-    const bigram = str2.substr(i, 2);
-    const count = bigrams1.get(bigram) || 0;
-    if (count > 0) {
-      bigrams1.set(bigram, count - 1);
-      intersection++;
-    }
-  }
-
-  return (2.0 * intersection) / (str1.length + str2.length - 2);
-}
-
-/**
- * Rimuove i tag HTML da una stringa di testo
- */
-export function stripHtml(html: string): string {
-  if (!html) return '';
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .trim();
-}
-
-export function normalizeTitle(title: string): string {
-  if (!title) return '';
-  return title.trim().replace(/\s+/g, ' ');
-}
-
-export function normalizeUrl(url: string): string {
-  if (!url) return '';
-  try {
-    const parsed = new URL(url);
-    return `${parsed.origin}${parsed.pathname}`.toLowerCase().replace(/\/$/, '');
-  } catch {
-    return url.trim().toLowerCase().replace(/\/$/, '');
-  }
-}
-
-export function sha1(str: string): string {
-  try {
-    const crypto = require('crypto');
-    return crypto.createHash('sha1').update(str).digest('hex');
-  } catch {
-    let block1 = 0, block2 = 0;
-    for (let i = 0; i < str.length; i++) {
-      const ch = str.charCodeAt(i);
-      block1 = (block1 * 31 + ch) | 0;
-      block2 = (block2 * 37 + ch) | 0;
-    }
-    return Math.abs(block1).toString(16) + Math.abs(block2).toString(16);
-  }
-}
+export const similarity = utilSimilarity;
+export const stripHtml = utilStripHtml;
+export const normalizeTitle = utilNormalizeTitle;
+export const normalizeUrl = utilNormalizeUrl;
+export const sha1 = utilSha1;
