@@ -1,66 +1,27 @@
 /**
  * lib/news/types.ts
- * Tipi strutturati flessibili per garantire la tolleranza totale tra snake_case e camelCase.
- * Fa da ponte (re-export) verso `@/lib/utils` per mantenere intatti gli import del progetto.
+ * Tipi condivisi e normalizzazione record PostgreSQL (Supabase) in NewsCardData.
+ * Aggiornato: Filtro Anti-Miniature e Forzatura Sinossi HD Estese.
  */
-import { 
-  similarity as utilSimilarity, 
-  stripHtml as utilStripHtml, 
-  normalizeTitle as utilNormalizeTitle, 
-  normalizeUrl as utilNormalizeUrl, 
-  sha1 as utilSha1 
-} from '@/lib/utils';
+import type { CategoryId } from '@/lib/rss/config';
 
-/** Struttura base rigida del DB news_items (Postgres standard) */
-export interface BaseNewsItemRow {
-  id: string;
+export interface NewsItem {
   hash: string;
-  source_id: string | null;
-  source_name: string | null;
+  sourceId: string;
+  sourceName: string;
   title: string;
   link: string;
-  description: string | null;
-  image_url: string | null;
-  lang: string;
-  priority: number; // Forzato numerico per evitare errori logici e NaN nei cicli .sort()
-  published_at: string;
-  tags: string[] | null;
-  category_id: string;
-  category_name?: string | null;
-  category_emoji?: string | null;
-  created_at: string;
+  description: string;
+  imageUrl: string | null;
+  lang: 'it' | 'en';
+  priority: 1 | 2;
+  publishedAt: string;
+  tags: string[];
+  categoryId: CategoryId;
 }
 
-/**
- * Estensione combinata con i campi camelCase alternativi.
- * Il Partial permette agli oggetti incompleti degli scraper (es. gnews.ts) di compilare senza errori.
- */
-export type NewsItemRow = Partial<Omit<BaseNewsItemRow, 'priority'>> & {
-  hash: string;
-  title: string;
-  link: string;
-  priority: number; 
-} & Partial<{
-  id: string;
-  sourceId: string | null;
-  sourceName: string | null;
-  imageUrl: string | null;
-  publishedAt: string; 
-  categoryId: string | null;
-  lang: string;
-  tags: string[] | null;
-}>;
-
-/**
- * Alias di tipo per mantenere la piena retrocompatibilità.
- */
-export type NewsItem = NewsItemRow;
-
-/**
- * Dati rigidi passati ai componenti d'interfaccia (NewsCard, ecc.)
- */
 export interface NewsCardData {
-  id: string;
+  id: string; // Hash SHA-1 logico della notizia
   title: string;
   link: string;
   description: string | null;
@@ -72,31 +33,137 @@ export interface NewsCardData {
   category_emoji?: string | null;
 }
 
-/**
- * Adapter — Mappa i dati in modo intelligente estraendo i valori
- * sia che l'oggetto di origine sia in formato snake_case, sia in camelCase.
- */
-export function toNewsCardData(row: NewsItemRow): NewsCardData {
-  return {
-    id: row.id || row.hash || '', 
-    title: row.title || '',
-    link: row.link || '',
-    description: row.description || null,
-    image_url: row.image_url || row.imageUrl || null,
-    source_name: row.source_name || row.sourceName || 'On The Corner',
-    published_at: row.published_at || row.publishedAt || new Date().toISOString(),
-    category_id: row.category_id || row.categoryId || 'generale',
-    category_name: row.category_name ?? null,
-    category_emoji: row.category_emoji ?? null,
-  };
+const STRIP_TAGS = /<[^>]+>/g;
+const MULTI_SPACE = /\s+/g;
+
+export function stripHtml(input: string | undefined | null): string {
+  if (!input) return '';
+  return input
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(STRIP_TAGS, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/'/g, "'")
+    .replace(MULTI_SPACE, ' ')
+    .trim();
 }
 
-/* ==========================================================================
-   PONTE DI ESPORTAZIONE VERSO UTILS (Risolve gli import di gnews, parser, run-sync)
-   ========================================================================== */
+export function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(MULTI_SPACE, ' ')
+    .trim();
+}
 
-export const similarity = utilSimilarity;
-export const stripHtml = utilStripHtml;
-export const normalizeTitle = utilNormalizeTitle;
-export const normalizeUrl = utilNormalizeUrl;
-export const sha1 = utilSha1;
+export function normalizeUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    const drop = ['utm_source','utm_medium','utm_campaign','utm_term','utm_content','utm_id','fbclid','gclid','ref','refsrc','source','share'];
+    drop.forEach((k) => u.searchParams.delete(k));
+    u.hash = '';
+    let s = u.toString();
+    if (s.endsWith('/')) s = s.slice(0, -1);
+    return s;
+  } catch {
+    return raw.trim();
+  }
+}
+
+export async function sha1(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const buf = await crypto.subtle.digest('SHA-1', data);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export function similarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (!a.length || !b.length) return 0;
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) (dp[i] as number[])[0] = i;
+  for (let j = 0; j <= n; j++) (dp[0] as number[])[j] = j;
+  for (let i = 1; i <= m; i++) {
+    const row = dp[i] as number[];
+    const prev = dp[i - 1] as number[];
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      row[j] = Math.min(
+        (prev[j] as number) + 1,
+        (row[j - 1] as number) + 1,
+        (prev[j - 1] as number) + cost,
+      );
+    }
+  }
+  return 1 - ((dp[m] as number[])[n] as number) / Math.max(m, n);
+}
+
+export function toNewsCardData(row: any): NewsCardData {
+  const categoryMeta: Record<string, { name: string; emoji: string }> = {
+    '1': { name: 'Calcio', emoji: '⚽' },
+    '2': { name: 'F1', emoji: '🏎️' },
+    '3': { name: 'Tennis', emoji: '🎾' },
+    '4': { name: 'MotoGP', emoji: '🏍️' }
+  };
+
+  const meta = categoryMeta[String(row.category_id || '')];
+
+  // 1. FILTRO ANTI-MINIATURE E SANIFICAZIONE IMMAGINI
+  let cleanImageUrl = row.image_url || row.imageUrl || null;
+  if (cleanImageUrl && typeof cleanImageUrl === 'string') {
+    cleanImageUrl = cleanImageUrl.trim();
+    if (cleanImageUrl.startsWith('http://')) {
+      cleanImageUrl = cleanImageUrl.replace('http://', 'https://');
+    }
+    cleanImageUrl = cleanImageUrl
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s/g, '%20');
+
+    // Scarta icone minuscole, loghi quadrati, avatar e stringhe Base64/SVG non valide per i feed HD
+    if (
+      cleanImageUrl.includes('avatar') ||
+      cleanImageUrl.includes('logo') ||
+      cleanImageUrl.includes('icon') ||
+      cleanImageUrl.includes('placeholder') ||
+      cleanImageUrl.includes('1x1') ||
+      cleanImageUrl.includes('150x150') ||
+      cleanImageUrl.includes('data:image/') || 
+      cleanImageUrl.endsWith('.svg')
+    ) {
+      cleanImageUrl = null; // Sblocca il fallback nativo per evitare foto sgranate o rotte
+    }
+  } else {
+    cleanImageUrl = null;
+  }
+
+  // 2. RECUPERO E OTTIMIZZAZIONE SINOSSI EDITORIALE ESTESA
+  // Unifica tutti i potenziali campi di riepilogo del database per recuperare il testo più denso
+  let cleanDescription = row.description || row.summary || row.content || '';
+  cleanDescription = cleanDescription.trim();
+
+  // Rimuove i tre puntini nativi di troncamento dei feed RSS prima di servire il dato
+  if (cleanDescription.endsWith('...')) {
+    cleanDescription = cleanDescription.slice(0, -3).trim();
+  }
+
+  return {
+    id: row.hash,
+    title: row.title || '',
+    link: row.link || row.url || '',
+    description: cleanDescription.length > 5 ? cleanDescription : null,
+    image_url: cleanImageUrl,
+    source_name: row.source_name || row.source || 'Premium Source',
+    published_at: row.published_at,
+    category_id: row.category_id ? String(row.category_id) : null,
+    category_name: meta ? meta.name : null,
+    category_emoji: meta ? meta.emoji : null,
+  };
+}
