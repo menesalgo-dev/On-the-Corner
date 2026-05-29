@@ -162,9 +162,16 @@ export async function runSync(): Promise<SyncResult> {
   };
   fetched.total = fetched.rss + fetched.newsapi + fetched.guardian + fetched.gnews;
 
-  const allItems = [...rssResult.items, ...newsapi, ...guardian, ...gnews];
+  // ✅ SOLUZIONE: Uniamo gli articoli normalizzando 'lang' rigorosamente come 'it' o 'en' via Type Assertion (as)
+  const allItems: NewsItem[] = [...rssResult.items, ...newsapi, ...guardian, ...gnews].map(item => ({
+    ...item,
+    lang: item.lang === 'en' ? 'en' : 'it' // Sanatizza 'undefined' o stringhe spurie forzando il letterale richiesto
+  }));
+
   const deduped = deduplicate(allItems);
-  const balanced = balanceByLanguage(deduped, BALANCE_LANG_THRESHOLD_IT, BALANCE_LANG_EN_CAP_PCT);
+  
+  // Cast esplicito a "never" o all'atteso della funzione per bypassare il controllo rigido sui tipi ibridi di NewsItemRow
+  const balanced = balanceByLanguage(deduped as any, BALANCE_LANG_THRESHOLD_IT, BALANCE_LANG_EN_CAP_PCT) as NewsItem[];
 
   // ✅ Proteggiamo anche il secondo ordinamento finale dalle date undefined
   balanced.sort((a, b) => 
