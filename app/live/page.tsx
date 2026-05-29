@@ -1,182 +1,148 @@
 /**
  * app/live/page.tsx
- * Live Tracker Hub - Versione Sofascore Timeline Completa.
- * Mostra match passati, presenti e futuri ordinati cronologicamente con auto-trigger su visita.
+ * Sezione eventi stile SofaScore.
+ * Navigazione date + match LIVE in cima + Programmati + Terminati.
  */
-import React from 'react';
-import { Radio, Activity, Clock, ChevronRight, CalendarCheck } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { NewsCard } from '@/components/news/NewsCard';
-import { fetchLatestNews, fetchUserBookmarkHashes, supabaseServer } from '@/lib/news';
-import { toNewsCardData } from '@/lib/news/types';
+import { MatchCard } from '@/components/match/MatchCard';
+import { MatchDateNav } from '@/components/match/MatchDateNav';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { fetchMatchesByDate } from '@/lib/sports/matches';
+import type { MatchRow } from '@/lib/sports/types';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 60;
 
-export default async function LivePage() {
-  // ⚡ AUTOMATIC TRIGGER ON VISIT (REFRESH DEGLI EVENTI OGNI 60 SECONDI)
-  try {
-    const { data: lastUpdatedMatch } = await supabaseServer
-      .from('live_matches')
-      .select('updated_at')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+export const metadata = {
+  title: 'Live scores — Calcio, Basket, F1',
+  description: 'Calendario partite, risultati live e classifiche.',
+};
 
-    const now = new Date().getTime();
-    const lastSync = lastUpdatedMatch?.updated_at ? new Date(lastUpdatedMatch.updated_at).getTime() : 0;
+interface PageProps {
+  searchParams: Promise<{ date?: string; sport?: string }>;
+}
 
-    if (now - lastSync > 60000) {
-      const host = process.env.NEXT_PUBLIC_SITE_URL || 
-                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-      
-      fetch(`${host}/api/manual-sync/live?secret=${process.env.CRON_SECRET}`, {
-        next: { revalidate: 0 }
-      }).catch(err => console.error("⚠️ Refresh ignorato:", err.message));
-    }
-  } catch (syncErr: any) {
-    console.error("⚠️ Sincronizzazione fallita:", syncErr.message);
+export default async function LivePage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const today = new Date().toISOString().slice(0, 10);
+  const activeDate = params.date ?? today;
+  const sportFilter = params.sport;
+
+  let matches = await fetchMatchesByDate(activeDate);
+  if (sportFilter) {
+    matches = matches.filter((m) => m.sport === sportFilter);
   }
 
-  // Estrazione universale di TUTTI i match della timeline dal DB
-  const [liveMatchesResult, rawNews, bookmarkHashes] = await Promise.all([
-    supabaseServer
-      .from('live_matches')
-      .select('*')
-      .order('match_minute', { ascending: true }), // Ordina cronologicamente per orario/minuto
-    fetchLatestNews({ limit: 4 }),
-    fetchUserBookmarkHashes(),
-  ]);
-
-  const liveMatches = liveMatchesResult.data || [];
-  const latestNews = (rawNews || []).map((row: any) => toNewsCardData(row));
-
-  // Raggruppamento Sofascore per Competizione/Lega
-  const matchesByLeague: Record<string, any[]> = {};
-  liveMatches.forEach((match) => {
-    const leagueKey = match.league || 'Altri Eventi';
-    if (!matchesByLeague[leagueKey]) {
-      matchesByLeague[leagueKey] = [];
-    }
-    matchesByLeague[leagueKey].push(match);
-  });
+  const live = matches.filter((m) => m.status === 'live');
+  const scheduled = matches.filter((m) => m.status === 'scheduled');
+  const finished = matches.filter((m) => m.status === 'finished');
+  const postponed = matches.filter((m) => m.status === 'postponed');
 
   return (
-    <div className="min-h-screen bg-otc-bg text-zinc-100 selection:bg-otc-accent/10 selection:text-otc-accent-2">
+    <>
       <Header />
 
-      <main className="mx-auto max-w-[1200px] px-5 py-8 md:py-10">
-        
-        {/* Intestazione Timeline */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 pb-4 border-b border-otc-line">
-          <div>
-            <h1 
-              className="text-lg font-bold uppercase tracking-widest text-zinc-200 font-mono flex items-center gap-2"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              <span className="inline-flex h-2 w-2 rounded-full bg-otc-accent animate-pulse-dot" />
-              Timeline Palinsesto<span className="text-otc-accent">.</span>
-            </h1>
-            <p className="text-xs text-zinc-500 mt-1">Risultati terminati, match in corso e incontri in programma oggi e nei prossimi giorni.</p>
-          </div>
-          <div className="text-[10px] font-mono tracking-wider text-zinc-400 uppercase mt-2 sm:mt-0 bg-otc-surface border border-otc-line px-2.5 py-1 rounded">
-            {liveMatches.length} Eventi Totali
-          </div>
+      <main className="mx-auto max-w-[1100px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12">
+        <header className="mb-2 flex items-baseline justify-between">
+          <h1
+            className="text-2xl uppercase tracking-tight sm:text-4xl"
+            style={{ fontFamily: 'var(--font-archivo-black)' }}
+          >
+            Live<span className="text-[#e8c800]">.</span>
+          </h1>
+          <span
+            className="text-[11px] uppercase tracking-widest text-zinc-500"
+            style={{ fontFamily: 'var(--font-dm-mono)' }}
+          >
+            {matches.length} match
+          </span>
         </header>
 
-        {liveMatches.length === 0 ? (
-          <div className="rounded-xl border border-otc-line bg-otc-surface p-8 text-center max-w-xl mx-auto my-12">
-            <CalendarCheck className="h-6 w-6 text-zinc-600 mx-auto mb-3" />
-            <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Nessun match programmato</h3>
-            <p className="text-xs text-zinc-500 mt-1">Il database si aggiornerà non appena l&apos;API distribuirà i nuovi blocchi di calendario.</p>
-          </div>
+        <MatchDateNav activeDate={activeDate} />
+
+        <SportFilter activeSport={sportFilter} activeDate={activeDate} today={today} />
+
+        {matches.length === 0 ? (
+          <EmptyState
+            emoji="📅"
+            title="Nessun match"
+            description="Nessuna partita programmata in questa data. Prova un altro giorno."
+            actionLabel="Vai a oggi"
+            actionHref="/live"
+          />
         ) : (
-          /* Blocchi per competizione */
-          <div className="space-y-6 mb-12">
-            {Object.entries(matchesByLeague).map(([leagueName, items]) => (
-              <div key={leagueName} className="rounded-xl border border-otc-line bg-[#070709] overflow-hidden">
-                
-                <div className="bg-otc-surface px-4 py-2 border-b border-otc-line text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-bold flex justify-between items-center">
-                  <span>🏆 {leagueName}</span>
-                  <span className="text-[9px] text-zinc-600 font-normal">Calcio</span>
-                </div>
-
-                <div className="divide-y divide-otc-line/40">
-                  {items.map((match) => {
-                    const isLive = match.event_status === 'live';
-                    const isFinished = match.event_status === 'finished';
-                    const isScheduled = match.event_status === 'scheduled';
-
-                    return (
-                      <div key={match.id} className="group p-4 flex items-center gap-4 bg-otc-bg transition hover:bg-otc-surface/20">
-                        
-                        {/* Gestione dinamica degli stati temporali della Timeline */}
-                        <div className="w-14 shrink-0 text-center flex flex-col items-center justify-center font-mono">
-                          {isLive ? (
-                            <span className="text-[10px] font-bold text-red-400 inline-flex items-center gap-0.5 animate-pulse-dot">
-                              <Activity className="h-3 w-3" />
-                              {match.match_minute}&apos;
-                            </span>
-                          ) : isFinished ? (
-                            <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[9px] text-zinc-500 uppercase font-bold border border-zinc-800/40">Fin</span>
-                          ) : (
-                            // Se il match è futuro, mostra l'orario di inizio (es: 20:45) o la data salvata
-                            <span className="text-[10px] text-zinc-400 font-bold inline-flex items-center gap-0.5 bg-otc-line/40 px-1.5 py-0.5 rounded">
-                              <Clock className="h-3 w-3 text-otc-accent" />
-                              {match.match_minute || 'FT'}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Squadre e Punteggio */}
-                        <div className="flex-1 space-y-1.5 border-l border-otc-line/60 pl-4">
-                          <div className="flex justify-between items-center">
-                            <span className={`text-xs tracking-tight ${isFinished && Number(match.home_score) < Number(match.away_score) ? 'text-zinc-500 line-through decoration-zinc-800' : 'text-zinc-200 group-hover:text-white'}`}>
-                              {match.home_team}
-                            </span>
-                            {!isScheduled && (
-                              <span className={`font-mono text-xs font-bold px-1.5 py-0.5 rounded ${isLive ? 'text-red-400 bg-red-500/5' : 'text-zinc-400'}`}>
-                                {match.home_score}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className={`text-xs tracking-tight ${isFinished && Number(match.away_score) < Number(match.home_score) ? 'text-zinc-500 line-through decoration-zinc-800' : 'text-zinc-200 group-hover:text-white'}`}>
-                              {match.away_team}
-                            </span>
-                            {!isScheduled && (
-                              <span className={`font-mono text-xs font-bold px-1.5 py-0.5 rounded ${isLive ? 'text-red-400 bg-red-500/5' : 'text-zinc-400'}`}>
-                                {match.away_score}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <ChevronRight className="h-3.5 w-3.5 text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity ml-2" />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+          <div className="space-y-6">
+            {live.length > 0 && <MatchSection label="Live ora" emoji="🔴" matches={live} />}
+            {scheduled.length > 0 && <MatchSection label="Programmati" emoji="⏰" matches={scheduled} />}
+            {finished.length > 0 && <MatchSection label="Terminati" emoji="✓" matches={finished} />}
+            {postponed.length > 0 && <MatchSection label="Rinviati" emoji="⏸" matches={postponed} />}
           </div>
         )}
-
-        {/* FEED NEWS INFERIORE */}
-        <section className="border-t border-zinc-900 pt-8">
-          <h2 className="mb-5 text-[10px] font-mono uppercase tracking-widest text-zinc-500">// Report e Approfondimenti Recenti</h2>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {latestNews.map((item) => (
-              <NewsCard key={item.id} news={item} isBookmarked={bookmarkHashes.has(item.id)} />
-            ))}
-          </div>
-        </section>
       </main>
 
       <Footer />
       <BottomNav />
-    </div>
+    </>
+  );
+}
+
+function MatchSection({ label, emoji, matches }: { label: string; emoji: string; matches: MatchRow[] }) {
+  const isLive = label === 'Live ora';
+  return (
+    <section>
+      <header className="mb-3 flex items-center gap-2">
+        <span className="text-base">{emoji}</span>
+        <h2
+          className="text-sm uppercase tracking-tight text-white sm:text-base"
+          style={{ fontFamily: 'var(--font-archivo-black)' }}
+        >
+          {label}
+        </h2>
+        <span
+          className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+            isLive ? 'bg-red-500/15 text-red-400' : 'bg-[#1f1f1f] text-zinc-400'
+          }`}
+          style={{ fontFamily: 'var(--font-dm-mono)' }}
+        >
+          {matches.length}
+        </span>
+      </header>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {matches.map((m) => <MatchCard key={m.id} match={m} />)}
+      </div>
+    </section>
+  );
+}
+
+import Link from 'next/link';
+function SportFilter({ activeSport, activeDate, today }: { activeSport?: string; activeDate: string; today: string }) {
+  const base = activeDate === today ? '/live' : `/live?date=${activeDate}`;
+  const withSport = (s: string) => activeDate === today ? `/live?sport=${s}` : `/live?date=${activeDate}&sport=${s}`;
+  const sports = [
+    { id: undefined, label: 'Tutti', emoji: '🏆' },
+    { id: 'calcio', label: 'Calcio', emoji: '⚽' },
+    { id: 'basket', label: 'Basket', emoji: '🏀' },
+  ];
+  return (
+    <nav className="mb-4 flex gap-2 overflow-x-auto scrollbar-hide">
+      {sports.map((s) => {
+        const active = s.id === activeSport;
+        const href = s.id ? withSport(s.id) : base;
+        return (
+          <Link
+            key={s.id ?? 'all'}
+            href={href}
+            className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition ${
+              active
+                ? 'border-[#e8c800] bg-[#e8c800] text-black'
+                : 'border-[#1f1f1f] bg-[#0d0d0d] text-zinc-400 hover:border-[#e8c800]/40 hover:text-[#e8c800]'
+            }`}
+          >
+            <span className="mr-1">{s.emoji}</span>{s.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
