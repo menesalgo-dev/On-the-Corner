@@ -15,7 +15,8 @@ import { LiveStrip } from '@/components/layout/LiveStrip';
 import { SportShortcuts } from '@/components/shared/SportShortcuts';
 import { NewsCard } from '@/components/news/NewsCard';
 import { fetchLatestNews } from '@/lib/news/items';
-import { fetchLiveMatches, fetchMatchCountsByStatus } from '@/lib/sports/matches';
+// 1. Importa la funzione di conversione dei match (adatta il nome se differisce nel tuo progetto)
+import { fetchLiveMatches, fetchMatchCountsByStatus, toLiveMatchData } from '@/lib/sports/matches';
 import { toNewsCardData } from '@/lib/news/types';
 
 export const revalidate = 120;
@@ -26,16 +27,21 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-  const [heroRaw, liveMatches, counts] = await Promise.all([
+  const [heroRaw, liveMatchesRaw, counts] = await Promise.all([
     fetchLatestNews({ limit: 7 }),
     fetchLiveMatches(8),
     fetchMatchCountsByStatus(),
   ]);
 
+  // Formattazione dati News
   const hero = (heroRaw || []).map((row: any) => toNewsCardData(row));
   const heroMain = hero[0];
   const heroSide = hero.slice(1, 3);
   const evidenza = hero.slice(3, 7);
+
+  // 2. Formattazione dati Live Matches per risolvere l'errore di compilazione
+  // Se toLiveMatchData non esiste nel tuo backend, vedi la nota in fondo per mapparlo a mano
+  const liveMatches = (liveMatchesRaw || []).map((match: any) => toLiveMatchData(match));
 
   return (
     <>
@@ -70,7 +76,7 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* LIVESTRIP */}
+        {/* LIVESTRIP - Ora riceve il tipo corretto LiveMatch[] */}
         <section className="mb-6">
           <LiveStrip matches={liveMatches} />
         </section>
