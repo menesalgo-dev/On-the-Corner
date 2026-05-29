@@ -5,7 +5,7 @@
  */
 import { categorize } from '@/lib/rss/categorize';
 // Importiamo NewsItemRow al posto di NewsItem che non esiste più
-import { type NewsItems, normalizeTitle, normalizeUrl, sha1 } from '@/lib/news/types';
+import { type NewsItem, normalizeTitle, normalizeUrl, sha1 } from '@/lib/news/types';
 
 interface GnewsArticle {
   title: string;
@@ -40,7 +40,7 @@ export async function fetchGnews(): Promise<NewsItems[]> {
   );
 
   // Array tipizzato correttamente in NewsItemRow[]
-  const items: NewsItems[] = [];
+  const items: NewsItem[] = [];
   const now = Date.now();
 
   for (let i = 0; i < results.length; i++) {
