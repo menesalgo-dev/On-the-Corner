@@ -1,11 +1,10 @@
 /**
  * lib/news.ts
  * Funzioni di interazione diretta con la tabella news_items.
- * Utilizza la Service Role Key per escludere blocchi RLS nel contesto server.
+ * Modifica: rimossa categoria "fantacalcio" dalla lista fetchCategories.
  */
 import { createClient } from '@supabase/supabase-js';
 
-// Estrazione dell'origine pulita per evitare corruzioni nei percorsi HTTP
 const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supaUrl = rawUrl ? new URL(rawUrl).origin : '';
 const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -14,11 +13,10 @@ if (!supaUrl || !supaKey) {
   throw new Error("Variabili d'ambiente Supabase mancanti lato server.");
 }
 
-// Client privilegiato per operazioni sicure server-side
 export const supabaseServer = createClient(supaUrl, supaKey, {
-  auth: { 
-    persistSession: false, 
-    autoRefreshToken: false 
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false
   }
 });
 
@@ -35,16 +33,13 @@ export async function getNewsItems({ category, source, page = 1, limit = 20 }: F
     let queryBuilder = supabaseServer.from('news_items').select('*', { count: 'exact' });
 
     if (category && category.toLowerCase() !== 'tutto' && category.toLowerCase() !== 'all') {
-      const categoryMapping: Record<string, number> = { 
-        'calcio': 1, 
-        'f1': 2, 
-        'tennis': 3, 
+      const categoryMapping: Record<string, number> = {
+        'calcio': 1,
+        'f1': 2,
+        'tennis': 3,
         'motogp': 4,
-        'fantacalcio': 5
       };
-      
       const mappedId = categoryMapping[category.toLowerCase()];
-      
       if (mappedId !== undefined) {
         queryBuilder = queryBuilder.or(`category_id.eq.${mappedId},category_id.eq.${category.toLowerCase()}`);
       } else {
@@ -88,13 +83,13 @@ export async function fetchNewsByHash(hash: string) {
   }
 }
 
-/** Recupera le ultime notizie inserite con limite di default 7 */
-export async function fetchLatestNews({ 
-  limit = 7, 
-  categoryId 
-}: { 
-  limit?: number; 
-  categoryId?: string 
+/** Recupera le ultime notizie inserite */
+export async function fetchLatestNews({
+  limit = 7,
+  categoryId
+}: {
+  limit?: number;
+  categoryId?: string
 } = {}) {
   try {
     let query = supabaseServer
@@ -102,7 +97,6 @@ export async function fetchLatestNews({
       .select('*')
       .order('published_at', { ascending: false });
 
-    // Filtro categoria opzionale
     if (categoryId && categoryId !== 'tutto') {
       query = query.eq('category_id', categoryId.toLowerCase().trim());
     }
@@ -132,7 +126,10 @@ export async function fetchUserBookmarkHashes(): Promise<Set<string>> {
   }
 }
 
-/** RESTITUISCE CONFIGURAZIONE CATEGORIE PER IL FRONTEND */
+/**
+ * Configurazione categorie per il frontend.
+ * NB: rimossa "fantacalcio" come richiesto.
+ */
 export async function fetchCategories() {
   return [
     { id: 'tutto', name: 'Tutto', short_name: 'Tutto', emoji: '📰', sort_order: 1 },
@@ -140,11 +137,10 @@ export async function fetchCategories() {
     { id: 'f1', name: 'F1', short_name: 'F1', emoji: '🏎️', sort_order: 3 },
     { id: 'tennis', name: 'Tennis', short_name: 'Tennis', emoji: '🎾', sort_order: 4 },
     { id: 'motogp', name: 'MotoGP', short_name: 'MotoGP', emoji: '🏍️', sort_order: 5 },
-    { id: 'fantacalcio', name: 'Fantacalcio', short_name: 'Fanta', emoji: '📈', sort_order: 6 }
   ];
 }
 
-/** CONTEGGI DINAMICI PER BADGE CATEGORIE */
+/** Conteggi dinamici per badge categorie */
 export async function fetchCategoryCounts(): Promise<Map<string, number>> {
   try {
     const { data, error } = await supabaseServer
@@ -157,10 +153,11 @@ export async function fetchCategoryCounts(): Promise<Map<string, number>> {
     let total = 0;
 
     counts.set('tutto', 0);
-    
+
     (data || []).forEach((row) => {
       const catId = String(row.category_id || '').toLowerCase().trim();
-      if (catId) {
+      // Escludi fantacalcio dai conteggi visibili (resta nel DB ma non mostrato)
+      if (catId && catId !== 'fantacalcio') {
         counts.set(catId, (counts.get(catId) || 0) + 1);
         total++;
       }
