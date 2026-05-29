@@ -70,17 +70,17 @@ export async function fetchGnews(): Promise<NewsItem[]> {
       items.push({
         hash,
         sourceId: `gnews_${a.source.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-        source_name: a.source.name,
+        sourcename: a.source.name,
         title: a.title,
         link,
         description,
-        image_url: a.image,
+        imageUrl: a.image,
         lang,
         priority: lang === 'it' ? 1 : 2,
-        published_at: new Date(ts).toISOString(),
+        publishedAt: new Date(ts).toISOString(),
         tags: ['gnews'],
-        category_id: categoryId,
-        created_at: new Date(now).toISOString(),
+        categoryId: categoryId,
+        createdAt: new Date(now).toISOString(),
       });
     }
   }
