@@ -1,7 +1,7 @@
 /**
  * lib/news/types.ts
  * Tipi strutturati flessibili per garantire la tolleranza totale tra snake_case e camelCase.
- * Risolve gli errori di type-checking nei moduli esterni (es. gnews.ts) fungendo da adapter.
+ * Risolve gli errori di type-checking nei moduli esterni (gnews.ts, parser.ts) fungendo da adapter.
  */
 
 /** Struttura base rigida del DB news_items (Postgres standard) */
@@ -24,8 +24,9 @@ export interface BaseNewsItemRow {
   created_at: string;
 }
 
-/** * Estensione con i campi camelCase alternativi usati dai vecchi script e scraper esterni.
- * Rendiamo i campi non bloccanti usando Partial, permettendo a gnews.ts di compilare.
+/**
+ * Estensione con i campi camelCase alternativi usati dai vecchi script e scraper esterni.
+ * Rendiamo i campi non bloccanti usando Partial, permettendo a gnews.ts e parser.ts di compilare.
  */
 export type NewsItemRow = Partial<BaseNewsItemRow> & {
   // Campi minimi sempre richiesti per l'identificazione della notizia
@@ -44,12 +45,13 @@ export type NewsItemRow = Partial<BaseNewsItemRow> & {
   tags: string[] | null;
 }>;
 
-/** * Alias di tipo per mantenere la retrocompatibilità con lib/external-news/gnews.ts
+/**
+ * Alias di tipo per mantenere la retrocompatibilità con i moduli esterni.
  */
 export type NewsItem = NewsItemRow;
 
 /**
- * Dati rigidi passati ai componenti card grafici della UI (NewsCard, ecc.)
+ * Dati rigidi passati ai componenti card della UI (NewsCard, ecc.)
  */
 export interface NewsCardData {
   id: string;
@@ -74,7 +76,6 @@ export function toNewsCardData(row: NewsItemRow): NewsCardData {
     title: row.title || '',
     link: row.link || '',
     description: row.description || null,
-    // Recupera dinamicamente da snake o camel a seconda di come lo scraper ha salvato il dato
     image_url: row.image_url || row.imageUrl || null,
     source_name: row.source_name || row.sourceName || 'On The Corner',
     published_at: row.published_at || row.publishedAt || new Date().toISOString(),
@@ -85,8 +86,22 @@ export function toNewsCardData(row: NewsItemRow): NewsCardData {
 }
 
 /* ==========================================================================
-   UTILITIES DI NORMALIZZAZIONE (Richieste dai moduli scraper/parser come gnews.ts)
+   UTILITIES DI NORMALIZZAZIONE (Richieste dai moduli scraper/parser)
    ========================================================================== */
+
+/**
+ * Rimuove i tag HTML da una stringa di testo (es. descrizione o sommario)
+ */
+export function stripHtml(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<[^>]*>/g, '') // Rimuove tutti i tag HTML <...>
+    .replace(/&nbsp;/g, ' ')  // Converte entità spazio vuoto
+    .replace(/&amp;/g, '&')   // Converte entità e commerciale
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim();
+}
 
 export function normalizeTitle(title: string): string {
   if (!title) return '';
