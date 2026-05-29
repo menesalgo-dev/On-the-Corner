@@ -1,61 +1,49 @@
 /**
- * lib/news/types.ts
- * Tipi e adapter per le news.
+ * lib/sports/types.ts
+ * Tipi condivisi per i match (calcio + basket + altri).
  */
 
-/** Riga DB news_items (snake_case Postgres). */
-export interface NewsItemRow {
+export type MatchSport = 'calcio' | 'basket' | 'tennis' | 'altro'
+export type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed'
+
+/** Riga DB matches (snake_case, come Postgres) */
+export interface MatchRow {
   id: string
-  hash: string
-  source_id: string | null
-  source_name: string | null
-  title: string
-  link: string
-  description: string | null
-  image_url: string | null
-  lang: string
-  priority: number | null
-  published_at: string
-  tags: string[] | null
-  category_id: string
+  match_key: string
+  external_id: string
+  sport: string
+  source: string
+  competition: string | null
+  competition_code: string | null
+  home_team: string
+  away_team: string
+  home_team_logo: string | null
+  away_team_logo: string | null
+  home_score: number | null
+  away_score: number | null
+  status: string
+  minute: string | null
+  start_time: string
+  venue: string | null
+  last_updated: string
   created_at: string
 }
 
-/**
- * Forma camelCase usata da NewsCard e altri componenti vecchi.
- * Mantenuta per retrocompatibilità con codice esistente.
- */
-export interface NewsCardData {
-  id: string
-  hash: string
-  sourceId: string | null
-  sourceName: string | null
-  title: string
-  link: string
-  description: string | null
-  imageUrl: string | null
-  lang: string
-  priority: number | null
-  publishedAt: string
-  tags: string[] | null
-  categoryId: string
-}
-
-/** Converte una riga snake_case del DB in camelCase per le card. */
-export function toNewsCardData(row: NewsItemRow): NewsCardData {
-  return {
-    id: row.id,
-    hash: row.hash,
-    sourceId: row.source_id,
-    sourceName: row.source_name,
-    title: row.title,
-    link: row.link,
-    description: row.description,
-    imageUrl: row.image_url,
-    lang: row.lang,
-    priority: row.priority,
-    publishedAt: row.published_at,
-    tags: row.tags,
-    categoryId: row.category_id,
-  }
+/** Dati match normalizzati dalle API esterne (prima dell'upsert su DB) */
+export interface MatchData {
+  externalId: string
+  sport: MatchSport
+  source: string
+  competition: string | null
+  competitionCode: string | null
+  homeTeam: string
+  awayTeam: string
+  homeTeamLogo: string | null
+  awayTeamLogo: string | null
+  homeScore: number | null
+  awayScore: number | null
+  status: MatchStatus
+  minute: string | null
+  startTime: string
+  venue: string | null
 }
