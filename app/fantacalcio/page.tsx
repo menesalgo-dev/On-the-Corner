@@ -8,7 +8,7 @@ import { Trophy, ShieldAlert, Sparkles } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
-import  NewsCard  from '@/components/news/NewsCard';
+import { NewsCard }  from '@/components/news/NewsCard';
 import { getNewsItems, fetchUserBookmarkHashes } from '@/lib/news';
 import { toNewsCardData } from '@/lib/news/types';
 import { EmptyState } from '@/components/shared/EmptyState';
