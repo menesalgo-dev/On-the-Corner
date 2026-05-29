@@ -2,8 +2,6 @@
  * app/news/[id]/page.tsx
  * Dettaglio singola notizia identificata tramite hash univoco.
  * Mostra immagine grande + Box Sinossi Editoriale + pulsante link esterno originale.
- *
- * Adattato allo schema camelCase di NewsCardData.
  */
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -57,18 +55,16 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
         <article className="rounded-3xl border border-[#1f1f1f] bg-[#0d0d0d] p-5 sm:p-8">
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            {news.sourceName && (
-              <span className="rounded-md bg-[#e8c800] px-2 py-0.5 text-[10px] uppercase tracking-widest text-black font-black" style={{ fontFamily: 'var(--font-archivo-black)' }}>
-                {news.sourceName}
-              </span>
-            )}
-            {news.categoryId && (
+            <span className="rounded-md bg-[#e8c800] px-2 py-0.5 text-[10px] uppercase tracking-widest text-black font-black" style={{ fontFamily: 'var(--font-archivo-black)' }}>
+              {news.source_name}
+            </span>
+            {news.category_name && (
               <span className="rounded-md border border-[#e8c800]/30 px-2 py-0.5 text-[10px] uppercase tracking-widest text-[#e8c800] font-medium">
-                {news.categoryId}
+                {news.category_emoji} {news.category_name}
               </span>
             )}
             <span className="text-[11px] uppercase tracking-wider text-zinc-400 ml-auto sm:ml-0" style={{ fontFamily: 'var(--font-dm-mono)' }} suppressHydrationWarning>
-              {formatRelative(news.publishedAt)}
+              {formatRelative(news.published_at)}
             </span>
           </div>
 
@@ -76,11 +72,10 @@ export default async function NewsDetailPage({ params }: PageProps) {
             {news.title}
           </h1>
 
-          {/* Immagine Copertina */}
-          {news.imageUrl && (
+          {news.image_url && (
             <div className="relative aspect-[16/9] w-full overflow-hidden rounded-2xl border border-zinc-800 bg-[#141414]">
               <Image
-                src={news.imageUrl}
+                src={news.image_url}
                 alt=""
                 fill
                 sizes="(min-width: 768px) 800px, 100vw"
@@ -91,7 +86,6 @@ export default async function NewsDetailPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* 📝 BOX SINOSSI EDITORIALE */}
           <div className="mt-8 rounded-2xl border border-zinc-900 bg-[#080808] p-5 md:p-6">
             <div className="flex items-center gap-2 mb-3 text-[#e8c800] text-xs font-mono uppercase tracking-wider">
               <FileText className="h-4 w-4" />
@@ -108,10 +102,9 @@ export default async function NewsDetailPage({ params }: PageProps) {
             )}
           </div>
 
-          {/* Barra delle Azioni Inferiore */}
           <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-[#1f1f1f] pt-6">
             <Link href={news.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-[#e8c800] px-5 py-3 text-sm uppercase tracking-wider text-black font-black transition hover:scale-[1.02]" style={{ fontFamily: 'var(--font-archivo-black)' }}>
-              Leggi l&apos;articolo {news.sourceName ? `su ${news.sourceName}` : 'originale'} <ExternalLink className="h-4 w-4" />
+              Leggi l&apos;articolo su {news.source_name} <ExternalLink className="h-4 w-4" />
             </Link>
             <div className="flex items-center gap-2 ml-sm-auto">
               <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
@@ -122,7 +115,6 @@ export default async function NewsDetailPage({ params }: PageProps) {
           </div>
         </article>
 
-        {/* Sezione Notizie Correlate */}
         {otherNews.length > 0 && (
           <section className="mt-12 border-t border-zinc-900 pt-8">
             <h2 className="mb-6 text-base uppercase tracking-tight text-white sm:text-xl font-black" style={{ fontFamily: 'var(--font-archivo-black)' }}>
