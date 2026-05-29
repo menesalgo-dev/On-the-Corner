@@ -1,13 +1,15 @@
 /**
  * lib/news/types.ts
- * Tipi strutturati per garantire la massima tolleranza tra snake_case e camelCase.
- * Risolve gli errori di compilazione nei moduli esterni (es. gnews.ts) senza modificarli.
+ * Tipi strutturati flessibili per garantire la tolleranza totale tra snake_case e camelCase.
+ * Risolve gli errori di type-checking nei moduli esterni (es. gnews.ts) fungendo da adapter.
  */
 
-/** Riga DB news_items e mappatura flessibile per parser esterni. */
-export interface NewsItemRow {
+/** Struttura base rigida del DB news_items (Postgres standard) */
+export interface BaseNewsItemRow {
   id: string;
   hash: string;
+  source_id: string | null;
+  source_name: string | null;
   title: string;
   link: string;
   description: string | null;
@@ -20,27 +22,34 @@ export interface NewsItemRow {
   category_name?: string | null;
   category_emoji?: string | null;
   created_at: string;
-
-  // Standard Database (snake_case)
-  source_id: string | null;
-  source_name: string | null;
-
-  // Supporto Retrocompatibilità (camelCase per gnews.ts e vecchi script)
-  // Definiti come opzionali per accettare oggetti scritti in entrambi i modi
-  sourceId?: string | null;
-  sourceName?: string | null;
-  imageUrl?: string | null;
-  publishedAt?: string | null;
-  categoryId?: string | null;
 }
 
-/** 
- * Alias di tipo richiesto da moduli terzi (es. lib/external-news/gnews.ts)
+/** * Estensione con i campi camelCase alternativi usati dai vecchi script e scraper esterni.
+ * Rendiamo i campi non bloccanti usando Partial, permettendo a gnews.ts di compilare.
+ */
+export type NewsItemRow = Partial<BaseNewsItemRow> & {
+  // Campi minimi sempre richiesti per l'identificazione della notizia
+  hash: string;
+  title: string;
+  link: string;
+} & Partial<{
+  id: string;
+  sourceId: string | null;
+  sourceName: string | null;
+  imageUrl: string | null;
+  publishedAt: string | null;
+  categoryId: string | null;
+  lang: string;
+  priority: number | null;
+  tags: string[] | null;
+}>;
+
+/** * Alias di tipo per mantenere la retrocompatibilità con lib/external-news/gnews.ts
  */
 export type NewsItem = NewsItemRow;
 
 /**
- * Dati passati ai componenti card della UI.
+ * Dati rigidi passati ai componenti card grafici della UI (NewsCard, ecc.)
  */
 export interface NewsCardData {
   id: string;
@@ -56,20 +65,20 @@ export interface NewsCardData {
 }
 
 /**
- * Adapter — Mappa i dati in modo intelligente estraendo i valori 
- * sia che l'oggetto di origine sia in snake_case sia in camelCase.
+ * Adapter — Mappa i dati in modo intelligente estraendo i valori
+ * sia che l'oggetto di origine sia in formato snake_case, sia in camelCase.
  */
 export function toNewsCardData(row: NewsItemRow): NewsCardData {
   return {
-    id: row.id,
-    title: row.title,
-    link: row.link,
-    description: row.description,
-    // Recupera il valore indipendentemente dal formato del campo sorgente
-    image_url: row.image_url || (row as any).imageUrl || null,
-    source_name: row.source_name || (row as any).sourceName || '',
-    published_at: row.published_at || (row as any).publishedAt || '',
-    category_id: row.category_id || (row as any).categoryId || null,
+    id: row.id || row.hash || '', 
+    title: row.title || '',
+    link: row.link || '',
+    description: row.description || null,
+    // Recupera dinamicamente da snake o camel a seconda di come lo scraper ha salvato il dato
+    image_url: row.image_url || row.imageUrl || null,
+    source_name: row.source_name || row.sourceName || 'On The Corner',
+    published_at: row.published_at || row.publishedAt || new Date().toISOString(),
+    category_id: row.category_id || row.categoryId || 'generale',
     category_name: row.category_name ?? null,
     category_emoji: row.category_emoji ?? null,
   };
