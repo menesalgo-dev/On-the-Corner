@@ -30,6 +30,12 @@ export interface NewsItemRow {
   created_at: string;
 }
 
+/** 
+ * Alias di tipo per mantenere la retrocompatibilità con i moduli esterni 
+ * (es. lib/external-news/gnews.ts) che cercano il tipo 'NewsItem'.
+ */
+export type NewsItem = NewsItemRow;
+
 /**
  * Dati passati ai componenti card.
  * Stesso schema di NewsItemRow ma con campi opzionali UI.
