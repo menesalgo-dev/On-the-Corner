@@ -18,8 +18,8 @@ import { fetchLatestNews } from '@/lib/news/items';
 import { fetchLiveMatches, fetchMatchCountsByStatus } from '@/lib/sports/matches';
 import { toNewsCardData } from '@/lib/news/types';
 
-// Assicurati di adattare i percorsi di importazione se i tipi si trovano altrove nel tuo progetto
-import type { LiveMatch, MatchRow } from '@/lib/sports/types'; 
+// Estraiamo dinamicamente il tipo del singolo match accettato dalle props di LiveStrip
+type LiveMatchFromComponent = React.ComponentProps<typeof LiveStrip>['matches'][number];
 
 export const revalidate = 120;
 
@@ -29,20 +29,19 @@ export const metadata = {
 };
 
 /**
- * Funzione di adapter che trasforma i dati grezzi del match (MatchRow)
- * nel formato richiesto dal componente d'interfaccia (LiveMatch).
- * Allinea le discrepanze tra snake_case del DB e camelCase del frontend.
+ * Funzione di adapter che trasforma i dati grezzi del match (MatchRow / any)
+ * nel formato esatto richiesto dal componente d'interfaccia LiveStrip.
  */
-function toLiveMatchData(row: MatchRow): LiveMatch {
+function toLiveMatchData(row: any): LiveMatchFromComponent {
   return {
     id: row.id,
     status: row.status,
     minute: row.minute ?? '',
     // Mappatura flessibile per gestire sia snake_case che camelCase provenienti dalla sorgente dati
-    homeTeam: (row as any).home_team_name || (row as any).home_team || (row as any).homeTeam || 'Home',
-    awayTeam: (row as any).away_team_name || (row as any).away_team || (row as any).awayTeam || 'Away',
-    homeScore: (row as any).home_score ?? (row as any).homeScore ?? 0,
-    awayScore: (row as any).away_score ?? (row as any).awayScore ?? 0,
+    homeTeam: row.homeTeam || row.home_team || row.home_team_name || 'Home',
+    awayTeam: row.awayTeam || row.away_team || row.away_team_name || 'Away',
+    homeScore: row.homeScore ?? row.home_score ?? 0,
+    awayScore: row.awayScore ?? row.away_score ?? 0,
     sport: row.sport || 'soccer',
   };
 }
@@ -61,7 +60,7 @@ export default async function HomePage() {
   const evidenza = hero.slice(3, 7);
 
   // Formattazione pulita e tipizzata dei Live Matches tramite la funzione di adapter
-  const liveMatches: LiveMatch[] = (liveMatchesRaw || []).map((row: MatchRow) => toLiveMatchData(row));
+  const liveMatches = (liveMatchesRaw || []).map((row: any) => toLiveMatchData(row));
 
   return (
     <>
@@ -96,7 +95,7 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* LIVESTRIP — Riceve l'array perfettamente tipizzato LiveMatch[] */}
+        {/* LIVESTRIP — Ora riceve l'array perfettamente tipizzato ricavato dal componente stesso */}
         <section className="mb-6">
           <LiveStrip matches={liveMatches} />
         </section>
