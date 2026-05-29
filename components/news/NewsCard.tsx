@@ -1,7 +1,14 @@
 /**
  * components/news/NewsCard.tsx
  * Card notizia Premium Minimal - Varianti: hero, default, compact.
- * Ottimizzato: Sinossi estese ad alta densità informativa e integrazione token otc.
+ * Adattato allo schema camelCase di lib/news/types.ts (NewsCardData).
+ *
+ * Mantiene TUTTE le funzioni precedenti:
+ *  - 3 varianti: hero, default, compact
+ *  - BookmarkButton in posizione bottom-right (default) o top-right (hero)
+ *  - FallbackThumb se manca immagine
+ *  - Sinossi estese fino a 4 righe (hero) e 3 righe (default)
+ *  - Token design system otc-*
  */
 import React from 'react';
 import Link from 'next/link';
@@ -9,19 +16,7 @@ import Image from 'next/image';
 import { Bookmark, ArrowUpRight } from 'lucide-react';
 import { BookmarkButton } from './BookmarkButton';
 import { formatRelative } from '@/lib/utils';
-
-export interface NewsCardData {
-  id: string;
-  title: string;
-  link: string;
-  description: string | null;
-  image_url: string | null;
-  source_name: string;
-  published_at: string;
-  category_id?: string | null;
-  category_name?: string | null;
-  category_emoji?: string | null;
-}
+import type { NewsCardData } from '@/lib/news/types';
 
 interface Props {
   news: NewsCardData;
@@ -40,14 +35,17 @@ export function NewsCard({ news, isBookmarked = false, variant = 'default' }: Pr
   return <DefaultVariant news={news} isBookmarked={isBookmarked} />;
 }
 
+/* ============================================================
+ * HERO VARIANT (full width banner)
+ * ============================================================ */
 function HeroVariant({ news, isBookmarked }: InternalProps) {
   return (
     <article className="group relative overflow-hidden rounded-2xl border border-otc-line bg-otc-surface transition duration-300 hover:border-zinc-700/80">
       <Link href={`/news/${news.id}`} prefetch={false} className="block">
         <div className="relative aspect-[16/9] w-full sm:aspect-[21/9] bg-otc-bg">
-          {news.image_url ? (
+          {news.imageUrl ? (
             <Image
-              src={news.image_url}
+              src={news.imageUrl}
               alt=""
               fill
               sizes="(min-width: 1024px) 1200px, 100vw"
@@ -62,23 +60,27 @@ function HeroVariant({ news, isBookmarked }: InternalProps) {
         </div>
         <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
           <div className="mb-2.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-400 font-mono">
-            <span className="text-otc-accent font-bold">{news.source_name}</span>
-            <span className="text-zinc-700">•</span>
-            {news.category_name && (
+            {news.sourceName && (
               <>
-                <span className="text-zinc-300">{news.category_name}</span>
+                <span className="text-otc-accent font-bold">{news.sourceName}</span>
                 <span className="text-zinc-700">•</span>
               </>
             )}
-            <span suppressHydrationWarning>{formatRelative(news.published_at)}</span>
+            {news.categoryId && (
+              <>
+                <span className="text-zinc-300">{news.categoryId}</span>
+                <span className="text-zinc-700">•</span>
+              </>
+            )}
+            <span suppressHydrationWarning>{formatRelative(news.publishedAt)}</span>
           </div>
-          <h2 
+          <h2
             className="text-xl font-bold tracking-tight text-zinc-100 sm:text-2xl lg:text-3xl max-w-4xl group-hover:text-otc-accent transition-colors duration-200 uppercase leading-[1.05]"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             {news.title}
           </h2>
-          {/* 📝 SINOSSI HERO ESTESA: Allungata a 4 righe dense per massima informazione */}
+          {/* 📝 SINOSSI HERO ESTESA: 4 righe dense per massima informazione */}
           {news.description && (
             <p className="mt-2 line-clamp-4 max-w-3xl text-xs text-zinc-400 leading-relaxed font-normal">
               {news.description}
@@ -93,14 +95,17 @@ function HeroVariant({ news, isBookmarked }: InternalProps) {
   );
 }
 
+/* ============================================================
+ * DEFAULT VARIANT (card griglia standard)
+ * ============================================================ */
 function DefaultVariant({ news, isBookmarked }: InternalProps) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-otc-line bg-otc-surface transition duration-300 hover:-translate-y-0.5 hover:border-zinc-700/60 hover:shadow-glow">
       <Link href={`/news/${news.id}`} prefetch={false} className="block">
         <div className="relative aspect-[16/9] w-full overflow-hidden bg-otc-bg border-b border-otc-line">
-          {news.image_url ? (
+          {news.imageUrl ? (
             <Image
-              src={news.image_url}
+              src={news.imageUrl}
               alt=""
               fill
               sizes="(min-width: 1024px) 400px, 100vw"
@@ -113,17 +118,21 @@ function DefaultVariant({ news, isBookmarked }: InternalProps) {
         </div>
         <div className="flex flex-1 flex-col p-4">
           <div className="mb-2 flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
-            <span className="text-otc-accent font-bold">{news.source_name}</span>
-            <span>•</span>
-            <span suppressHydrationWarning>{formatRelative(news.published_at)}</span>
+            {news.sourceName && (
+              <>
+                <span className="text-otc-accent font-bold">{news.sourceName}</span>
+                <span>•</span>
+              </>
+            )}
+            <span suppressHydrationWarning>{formatRelative(news.publishedAt)}</span>
           </div>
-          <h3 
+          <h3
             className="line-clamp-2 text-sm font-bold uppercase leading-tight tracking-tight text-zinc-200 group-hover:text-otc-accent transition-colors duration-200 mb-2.5"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             {news.title}
           </h3>
-          {/* 📝 SINOSSI DEFAULT INSERITA: Mostra fino a 3 righe per arricchire la visualizzazione */}
+          {/* 📝 SINOSSI DEFAULT: 3 righe per arricchire la visualizzazione */}
           {news.description && (
             <p className="line-clamp-3 text-xs text-zinc-500 leading-relaxed font-normal">
               {news.description}
@@ -131,10 +140,10 @@ function DefaultVariant({ news, isBookmarked }: InternalProps) {
           )}
         </div>
       </Link>
-      {/* 🛠️ NUOVA POSIZIONE TASTO SEGNALIBRI: Spostato in basso a destra per pulizia visiva */}
+      {/* 🛠️ Tasto segnalibri in basso a destra per pulizia visiva */}
       <div className="flex items-center justify-between border-t border-otc-line px-4 py-2.5 bg-[#050507] mt-auto">
         <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">
-          {news.category_name || 'Sport'}
+          {news.categoryId || 'Sport'}
         </span>
         <div className="opacity-40 group-hover:opacity-100 transition-opacity">
           <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
@@ -144,19 +153,22 @@ function DefaultVariant({ news, isBookmarked }: InternalProps) {
   );
 }
 
+/* ============================================================
+ * COMPACT VARIANT (lista densa)
+ * ============================================================ */
 function CompactVariant({ news }: InternalProps) {
   return (
     <article className="group flex gap-3 rounded-lg border border-otc-line bg-otc-surface p-2 transition duration-200 hover:border-zinc-800/80">
       <Link href={`/news/${news.id}`} prefetch={false} className="flex flex-1 gap-3 items-center">
         <div className="relative h-11 w-14 shrink-0 overflow-hidden rounded bg-otc-bg border border-otc-line">
-          {news.image_url ? (
-            <Image 
-              src={news.image_url} 
-              alt="" 
-              fill 
-              sizes="56px" 
-              className="object-cover opacity-85" 
-              unoptimized 
+          {news.imageUrl ? (
+            <Image
+              src={news.imageUrl}
+              alt=""
+              fill
+              sizes="56px"
+              className="object-cover opacity-85"
+              unoptimized
             />
           ) : (
             <FallbackThumb compact />
@@ -164,9 +176,13 @@ function CompactVariant({ news }: InternalProps) {
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center">
           <div className="mb-0.5 flex items-center gap-1.5 text-[8px] font-mono uppercase tracking-wider text-zinc-500">
-            <span className="text-otc-accent">{news.source_name}</span>
-            <span>•</span>
-            <span suppressHydrationWarning>{formatRelative(news.published_at)}</span>
+            {news.sourceName && (
+              <>
+                <span className="text-otc-accent">{news.sourceName}</span>
+                <span>•</span>
+              </>
+            )}
+            <span suppressHydrationWarning>{formatRelative(news.publishedAt)}</span>
           </div>
           <h4 className="line-clamp-1 text-xs font-semibold leading-tight text-zinc-300 group-hover:text-otc-accent transition-colors">
             {news.title}
@@ -178,6 +194,9 @@ function CompactVariant({ news }: InternalProps) {
   );
 }
 
+/* ============================================================
+ * FALLBACK THUMB (quando manca immagine)
+ * ============================================================ */
 function FallbackThumb({ compact }: { compact?: boolean } = {}) {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-otc-surface-2 border border-otc-line/40 rounded-lg">
