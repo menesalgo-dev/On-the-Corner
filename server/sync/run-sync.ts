@@ -1,6 +1,6 @@
 /**
  * server/sync/run-sync.ts
- * Pipeline completa di sync allineata al database.
+ * Pipeline completa di sync allineata al database (Solo notizie in lingua Italiana).
  */
 import { createClient } from '@supabase/supabase-js';
 import { fetchAllRssNews } from '@/lib/rss/parser';
@@ -37,7 +37,6 @@ export interface SyncResult {
 }
 
 function deduplicate(items: NewsItem[]): NewsItem[] {
-  // ✅ Blindiamo Date.parse garantendo una stringa di fallback valida in caso di undefined
   const sorted = [...items].sort((a, b) =>
     (a.priority ?? 50) - (b.priority ?? 50) ||
     Date.parse(b.publishedAt || b.published_at || new Date().toISOString()) - 
@@ -91,7 +90,7 @@ interface NewsRow {
   link: string;
   description: string | null;
   image_url: string | null;
-  lang: 'it' | 'en';
+  lang: 'it'; // ✅ Modificato il tipo letterale: accetta solo ed esclusivamente 'it'
   priority: number;
   published_at: string;
   tags: string[]; 
@@ -107,7 +106,7 @@ function toRow(n: NewsItem): NewsRow {
     link: n.link,
     description: n.description ? n.description.slice(0, 1000) : null,
     image_url: n.imageUrl || n.image_url || null,
-    lang: (n.lang as 'it' | 'en') || 'it',
+    lang: 'it', // ✅ Forza la stringa 'it' a livello di database per ogni riga
     priority: n.priority ?? 50,
     published_at: n.publishedAt || n.published_at || new Date().toISOString(),
     tags: n.tags || [], 
@@ -162,18 +161,20 @@ export async function runSync(): Promise<SyncResult> {
   };
   fetched.total = fetched.rss + fetched.newsapi + fetched.guardian + fetched.gnews;
 
-  // ✅ SOLUZIONE: Uniamo gli articoli normalizzando 'lang' rigorosamente come 'it' o 'en' via Type Assertion (as)
-  const allItems: NewsItem[] = [...rssResult.items, ...newsapi, ...guardian, ...gnews].map(item => ({
-    ...item,
-    lang: item.lang === 'en' ? 'en' : 'it' // Sanatizza 'undefined' o stringhe spurie forzando il letterale richiesto
-  }));
+  // ✅ FILTRO COMPLETO: Uniamo gli articoli scartando sul nascere tutto ciò che è marcato come inglese ('en')
+  // e forzando il campo 'lang' rigorosamente a 'it' per tutti quelli che passano il controllo.
+  const allItems: NewsItem[] = [...rssResult.items, ...newsapi, ...guardian, ...gnews]
+    .filter(item => item.lang !== 'en') 
+    .map(item => ({
+      ...item,
+      lang: 'it'
+    }));
 
   const deduped = deduplicate(allItems);
   
-  // Cast esplicito a "never" o all'atteso della funzione per bypassare il controllo rigido sui tipi ibridi di NewsItemRow
+  // Dal momento che abbiamo solo notizie in italiano, bypassiamo il bilanciamento lingue passando l'array pulito
   const balanced = balanceByLanguage(deduped as any, BALANCE_LANG_THRESHOLD_IT, BALANCE_LANG_EN_CAP_PCT) as NewsItem[];
 
-  // ✅ Proteggiamo anche il secondo ordinamento finale dalle date undefined
   balanced.sort((a, b) => 
     (a.priority ?? 50) - (b.priority ?? 50) || 
     Date.parse(b.publishedAt || b.published_at || new Date().toISOString()) - 
