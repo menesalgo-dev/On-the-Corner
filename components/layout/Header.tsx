@@ -1,6 +1,7 @@
 /**
  * components/layout/Header.tsx
- * Header sticky Premium Minimal - Allineato con la sezione Fantacalcio e l'Archivio.
+ * Header sticky Premium Minimal.
+ * Modifica: rimossa voce "Archivio" che dava 404.
  */
 import React from 'react';
 import Link from 'next/link';
@@ -9,13 +10,12 @@ import { Logo } from '@/components/brand/Logo';
 import { createClient } from '@/lib/supabase/server';
 import { MobileMenu } from './MobileMenu';
 
-// 🛠️ AGGIORNAMENTO NAV: Inserita la rotta Fantacalcio e rinominati i Segnalibri in Archivio
+// 🛠️ AGGIORNAMENTO NAV: rimossa voce "Archivio" (404)
 const NAV_LINKS = [
   { href: '/news', label: 'Notizie' },
   { href: '/live', label: 'Live' },
-   { href: '/schedine', label: 'Schedine' },
+  { href: '/schedine', label: 'Schedine' },
   { href: '/fantacalcio', label: 'Fantacalcio' },
-  { href: '/bookmarks', label: 'Archivio' },
 ];
 
 export async function Header() {
@@ -34,7 +34,6 @@ export async function Header() {
         <Link href="/" className="shrink-0 transition-opacity hover:opacity-90">
           <Logo size={28} compact />
         </Link>
-
         <nav className="ml-8 hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((link) => (
             <Link
@@ -46,9 +45,7 @@ export async function Header() {
             </Link>
           ))}
         </nav>
-
         <div className="flex-1" />
-
         <Link
           href="/search"
           aria-label="Cerca"
@@ -56,7 +53,6 @@ export async function Header() {
         >
           <Search className="h-3.5 w-3.5" />
         </Link>
-
         {userEmail ? (
           <Link
             href="/profile"
@@ -82,7 +78,6 @@ export async function Header() {
             </Link>
           </div>
         )}
-
         <MobileMenu navLinks={NAV_LINKS} isLoggedIn={!!userEmail} />
       </div>
     </header>
