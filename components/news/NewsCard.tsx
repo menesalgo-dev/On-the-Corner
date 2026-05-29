@@ -1,206 +1,252 @@
 /**
- * components/news/NewsCard.tsx
- * Card notizia Premium Minimal - Varianti: hero, default, compact.
- * Adattato allo schema camelCase di lib/news/types.ts (NewsCardData).
+ * app/news/page.tsx — Archivio news
  *
- * Mantiene TUTTE le funzioni precedenti:
- *  - 3 varianti: hero, default, compact
- *  - BookmarkButton in posizione bottom-right (default) o top-right (hero)
- *  - FallbackThumb se manca immagine
- *  - Sinossi estese fino a 4 righe (hero) e 3 righe (default)
- *  - Token design system otc-*
+ * Layout: filtri chips orizzontali sticky + lista compact NewsCard +
+ * paginazione + CTA torna alla home.
+ *
+ * Schema snake_case allineato a NewsCard.
  */
-import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { Bookmark, ArrowUpRight } from 'lucide-react';
-import { BookmarkButton } from './BookmarkButton';
-import { formatRelative } from '@/lib/utils';
-import type { NewsCardData } from '@/lib/news/types';
+import { Search, ChevronLeft, Home as HomeIcon } from 'lucide-react';
+import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
+import { BottomNav } from '@/components/layout/BottomNav';
+import { NewsCard } from '@/components/news/NewsCard';
+import { fetchNewsArchive, fetchCategoryCounts } from '@/lib/news/items';
+import { fetchMatchCountsByStatus } from '@/lib/sports/matches';
+import { toNewsCardData } from '@/lib/news/types';
+import { fetchUserBookmarkHashes } from '@/lib/news';
 
-interface Props {
-  news: NewsCardData;
-  isBookmarked?: boolean;
-  variant?: 'hero' | 'default' | 'compact';
+export const revalidate = 60;
+
+interface PageProps {
+  searchParams: Promise<{
+    category?: string;
+    source?: string;
+    page?: string;
+  }>;
 }
 
-interface InternalProps {
-  news: NewsCardData;
-  isBookmarked: boolean;
+const PAGE_SIZE = 20;
+
+export async function generateMetadata({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const cat = params.category;
+  return {
+    title: cat ? `News ${cat} — On The Corner` : 'Archivio news sportive',
+    description: 'Tutte le notizie sportive aggiornate ogni 30 minuti.',
+  };
 }
 
-export function NewsCard({ news, isBookmarked = false, variant = 'default' }: Props) {
-  if (variant === 'hero') return <HeroVariant news={news} isBookmarked={isBookmarked} />;
-  if (variant === 'compact') return <CompactVariant news={news} isBookmarked={isBookmarked} />;
-  return <DefaultVariant news={news} isBookmarked={isBookmarked} />;
-}
+export default async function NewsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const page = Math.max(1, parseInt(params.page ?? '1') || 1);
+  const category = params.category;
+  const sourceId = params.source;
 
-/* ============================================================
- * HERO VARIANT (full width banner)
- * ============================================================ */
-function HeroVariant({ news, isBookmarked }: InternalProps) {
+  const [itemsRaw, total, categoryCounts, matchCounts, bookmarkHashes] = await Promise.all([
+    fetchNewsArchive({ page, pageSize: PAGE_SIZE, categoryId: category, sourceId }),
+    fetchNewsArchive({ countOnly: true, categoryId: category, sourceId }),
+    fetchCategoryCounts(),
+    fetchMatchCountsByStatus(),
+    fetchUserBookmarkHashes(),
+  ]);
+
+  const items = Array.isArray(itemsRaw)
+    ? itemsRaw.map((r: any) => toNewsCardData(r))
+    : [];
+  const totalCount = typeof total === 'number' ? total : 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-otc-line bg-otc-surface transition duration-300 hover:border-zinc-700/80">
-      <Link href={`/news/${news.id}`} prefetch={false} className="block">
-        <div className="relative aspect-[16/9] w-full sm:aspect-[21/9] bg-otc-bg">
-          {news.imageUrl ? (
-            <Image
-              src={news.imageUrl}
-              alt=""
-              fill
-              sizes="(min-width: 1024px) 1200px, 100vw"
-              className="object-cover opacity-85 transition-transform duration-700 ease-out group-hover:scale-[1.01] group-hover:opacity-100"
-              unoptimized
-              priority
-            />
-          ) : (
-            <FallbackThumb />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-otc-bg via-otc-bg/50 to-transparent" />
-        </div>
-        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
-          <div className="mb-2.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-400 font-mono">
-            {news.sourceName && (
-              <>
-                <span className="text-otc-accent font-bold">{news.sourceName}</span>
-                <span className="text-zinc-700">•</span>
-              </>
-            )}
-            {news.categoryId && (
-              <>
-                <span className="text-zinc-300">{news.categoryId}</span>
-                <span className="text-zinc-700">•</span>
-              </>
-            )}
-            <span suppressHydrationWarning>{formatRelative(news.publishedAt)}</span>
-          </div>
-          <h2
-            className="text-xl font-bold tracking-tight text-zinc-100 sm:text-2xl lg:text-3xl max-w-4xl group-hover:text-otc-accent transition-colors duration-200 uppercase leading-[1.05]"
-            style={{ fontFamily: 'var(--font-display)' }}
+    <>
+      <Header />
+
+      <main className="mx-auto max-w-[1100px] px-4 pb-24 pt-4 sm:px-6 sm:pb-12 sm:pt-6">
+        {/* Breadcrumb */}
+        <nav className="mb-3 flex items-center gap-2 text-xs">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 text-zinc-500 transition hover:text-[#e8c800]"
           >
-            {news.title}
-          </h2>
-          {/* 📝 SINOSSI HERO ESTESA: 4 righe dense per massima informazione */}
-          {news.description && (
-            <p className="mt-2 line-clamp-4 max-w-3xl text-xs text-zinc-400 leading-relaxed font-normal">
-              {news.description}
+            <HomeIcon className="h-3.5 w-3.5" />
+            Home
+          </Link>
+          <span className="text-zinc-700">/</span>
+          <span
+            className="uppercase tracking-widest text-zinc-300"
+            style={{ fontFamily: 'var(--font-dm-mono)' }}
+          >
+            Archivio
+          </span>
+        </nav>
+
+        {/* Header */}
+        <header className="mb-4 flex items-baseline justify-between">
+          <div>
+            <h1
+              className="text-2xl uppercase tracking-tight sm:text-4xl"
+              style={{ fontFamily: 'var(--font-archivo-black)' }}
+            >
+              {category ?? 'Tutte'}<span className="text-[#e8c800]">.</span>
+            </h1>
+            <p
+              className="mt-1 text-[10px] uppercase tracking-widest text-zinc-500"
+              style={{ fontFamily: 'var(--font-dm-mono)' }}
+            >
+              {totalCount} articoli · pagina {page}/{totalPages}
             </p>
-          )}
-        </div>
-      </Link>
-      <div className="absolute right-4 top-4 z-10 opacity-60 group-hover:opacity-100 transition-opacity">
-        <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
-      </div>
-    </article>
+          </div>
+        </header>
+
+        {/* Filtri categoria */}
+        <CategoryFilter activeCategory={category} categoryCounts={categoryCounts} />
+
+        {/* Lista */}
+        {items.length === 0 ? (
+          <EmptyResults />
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {items.map((n) => (
+              <NewsCard
+                key={n.id}
+                news={n}
+                isBookmarked={bookmarkHashes.has(n.id)}
+                variant="compact"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Paginazione */}
+        {totalPages > 1 && (
+          <Pagination page={page} totalPages={totalPages} category={category} />
+        )}
+
+        {/* CTA torna alla home */}
+        <Link
+          href="/"
+          className="mt-8 flex items-center justify-center gap-2 rounded-xl border border-[#1f1f1f] bg-[#0d0d0d] py-3 text-xs uppercase tracking-widest text-zinc-400 transition hover:border-[#e8c800]/40 hover:text-[#e8c800]"
+          style={{ fontFamily: 'var(--font-dm-mono)' }}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Torna alla home
+        </Link>
+      </main>
+
+      <Footer />
+      <BottomNav liveCount={matchCounts.live} />
+    </>
   );
 }
 
-/* ============================================================
- * DEFAULT VARIANT (card griglia standard)
- * ============================================================ */
-function DefaultVariant({ news, isBookmarked }: InternalProps) {
+function CategoryFilter({
+  activeCategory, categoryCounts,
+}: { activeCategory?: string; categoryCounts: Record<string, number> }) {
+  const cats: { id: string | undefined; label: string }[] = [
+    { id: undefined, label: 'Tutte' },
+    { id: 'calcio', label: '⚽ Calcio' },
+    { id: 'champions', label: '🏆 Champions' },
+    { id: 'f1', label: '🏎️ F1' },
+    { id: 'motogp', label: '🏍️ MotoGP' },
+    { id: 'tennis', label: '🎾 Tennis' },
+    { id: 'nfl', label: '🏈 NFL' },
+    { id: 'fantacalcio', label: '🎮 Fanta' },
+    { id: 'altro', label: '📰 Altro' },
+  ];
+
   return (
-    <article className="group flex flex-col overflow-hidden rounded-xl border border-otc-line bg-otc-surface transition duration-300 hover:-translate-y-0.5 hover:border-zinc-700/60 hover:shadow-glow">
-      <Link href={`/news/${news.id}`} prefetch={false} className="block">
-        <div className="relative aspect-[16/9] w-full overflow-hidden bg-otc-bg border-b border-otc-line">
-          {news.imageUrl ? (
-            <Image
-              src={news.imageUrl}
-              alt=""
-              fill
-              sizes="(min-width: 1024px) 400px, 100vw"
-              className="object-cover opacity-85 transition-transform duration-500 ease-out group-hover:scale-[1.02]"
-              unoptimized
-            />
-          ) : (
-            <FallbackThumb />
-          )}
-        </div>
-        <div className="flex flex-1 flex-col p-4">
-          <div className="mb-2 flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
-            {news.sourceName && (
-              <>
-                <span className="text-otc-accent font-bold">{news.sourceName}</span>
-                <span>•</span>
-              </>
-            )}
-            <span suppressHydrationWarning>{formatRelative(news.publishedAt)}</span>
-          </div>
-          <h3
-            className="line-clamp-2 text-sm font-bold uppercase leading-tight tracking-tight text-zinc-200 group-hover:text-otc-accent transition-colors duration-200 mb-2.5"
-            style={{ fontFamily: 'var(--font-display)' }}
+    <nav className="mb-5 -mx-4 flex gap-2 overflow-x-auto px-4 scrollbar-hide sm:mx-0 sm:px-0">
+      {cats.map((c) => {
+        const active = c.id === activeCategory;
+        const count = c.id
+          ? (categoryCounts[c.id] ?? 0)
+          : Object.values(categoryCounts).reduce((s, n) => s + n, 0);
+        return (
+          <Link
+            key={c.id ?? 'all'}
+            href={c.id ? `/news?category=${c.id}` : '/news'}
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition ${
+              active
+                ? 'border-[#e8c800] bg-[#e8c800] text-black'
+                : 'border-[#1f1f1f] bg-[#0d0d0d] text-zinc-400 hover:border-[#e8c800]/40 hover:text-[#e8c800]'
+            }`}
           >
-            {news.title}
-          </h3>
-          {/* 📝 SINOSSI DEFAULT: 3 righe per arricchire la visualizzazione */}
-          {news.description && (
-            <p className="line-clamp-3 text-xs text-zinc-500 leading-relaxed font-normal">
-              {news.description}
-            </p>
-          )}
-        </div>
-      </Link>
-      {/* 🛠️ Tasto segnalibri in basso a destra per pulizia visiva */}
-      <div className="flex items-center justify-between border-t border-otc-line px-4 py-2.5 bg-[#050507] mt-auto">
-        <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">
-          {news.categoryId || 'Sport'}
+            {c.label}
+            {count > 0 && (
+              <span className={`ml-1.5 ${active ? 'text-black/60' : 'text-zinc-600'}`}>
+                {count}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function Pagination({
+  page, totalPages, category,
+}: { page: number; totalPages: number; category?: string }) {
+  const baseQs = category ? `category=${category}&` : '';
+  const prevHref = page > 1 ? `/news?${baseQs}page=${page - 1}` : null;
+  const nextHref = page < totalPages ? `/news?${baseQs}page=${page + 1}` : null;
+
+  return (
+    <nav className="mt-6 flex items-center justify-center gap-2">
+      {prevHref ? (
+        <Link
+          href={prevHref}
+          className="rounded-lg border border-[#1f1f1f] bg-[#0d0d0d] px-4 py-2 text-xs uppercase tracking-wider text-zinc-300 transition hover:border-[#e8c800]/40 hover:text-[#e8c800]"
+          style={{ fontFamily: 'var(--font-dm-mono)' }}
+        >
+          ← Precedente
+        </Link>
+      ) : (
+        <span className="cursor-not-allowed rounded-lg border border-[#1f1f1f] bg-[#0d0d0d] px-4 py-2 text-xs uppercase tracking-wider text-zinc-700">
+          ← Precedente
         </span>
-        <div className="opacity-40 group-hover:opacity-100 transition-opacity">
-          <BookmarkButton newsHash={news.id} initialBookmarked={isBookmarked} />
-        </div>
-      </div>
-    </article>
+      )}
+      <span
+        className="px-3 text-xs uppercase tracking-widest text-zinc-500"
+        style={{ fontFamily: 'var(--font-dm-mono)' }}
+      >
+        {page} / {totalPages}
+      </span>
+      {nextHref ? (
+        <Link
+          href={nextHref}
+          className="rounded-lg border border-[#1f1f1f] bg-[#0d0d0d] px-4 py-2 text-xs uppercase tracking-wider text-zinc-300 transition hover:border-[#e8c800]/40 hover:text-[#e8c800]"
+          style={{ fontFamily: 'var(--font-dm-mono)' }}
+        >
+          Successivo →
+        </Link>
+      ) : (
+        <span className="cursor-not-allowed rounded-lg border border-[#1f1f1f] bg-[#0d0d0d] px-4 py-2 text-xs uppercase tracking-wider text-zinc-700">
+          Successivo →
+        </span>
+      )}
+    </nav>
   );
 }
 
-/* ============================================================
- * COMPACT VARIANT (lista densa)
- * ============================================================ */
-function CompactVariant({ news }: InternalProps) {
+function EmptyResults() {
   return (
-    <article className="group flex gap-3 rounded-lg border border-otc-line bg-otc-surface p-2 transition duration-200 hover:border-zinc-800/80">
-      <Link href={`/news/${news.id}`} prefetch={false} className="flex flex-1 gap-3 items-center">
-        <div className="relative h-11 w-14 shrink-0 overflow-hidden rounded bg-otc-bg border border-otc-line">
-          {news.imageUrl ? (
-            <Image
-              src={news.imageUrl}
-              alt=""
-              fill
-              sizes="56px"
-              className="object-cover opacity-85"
-              unoptimized
-            />
-          ) : (
-            <FallbackThumb compact />
-          )}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-center">
-          <div className="mb-0.5 flex items-center gap-1.5 text-[8px] font-mono uppercase tracking-wider text-zinc-500">
-            {news.sourceName && (
-              <>
-                <span className="text-otc-accent">{news.sourceName}</span>
-                <span>•</span>
-              </>
-            )}
-            <span suppressHydrationWarning>{formatRelative(news.publishedAt)}</span>
-          </div>
-          <h4 className="line-clamp-1 text-xs font-semibold leading-tight text-zinc-300 group-hover:text-otc-accent transition-colors">
-            {news.title}
-          </h4>
-        </div>
-        <ArrowUpRight className="h-3 w-3 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity mr-1" />
+    <div className="rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] p-10 text-center">
+      <Search className="mx-auto h-8 w-8 text-zinc-600" />
+      <h2 className="mt-3 text-lg uppercase text-white" style={{ fontFamily: 'var(--font-archivo-black)' }}>
+        Nessuna notizia
+      </h2>
+      <p className="mt-1 text-sm text-zinc-400">
+        Per questa categoria non ci sono articoli recenti.
+      </p>
+      <Link
+        href="/news"
+        className="mt-4 inline-block rounded-lg bg-[#e8c800] px-4 py-2 text-xs uppercase tracking-wider text-black"
+        style={{ fontFamily: 'var(--font-archivo-black)' }}
+      >
+        Vedi tutte
       </Link>
-    </article>
-  );
-}
-
-/* ============================================================
- * FALLBACK THUMB (quando manca immagine)
- * ============================================================ */
-function FallbackThumb({ compact }: { compact?: boolean } = {}) {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-otc-surface-2 border border-otc-line/40 rounded-lg">
-      <Bookmark className={compact ? 'h-3 w-3 text-zinc-800' : 'h-5 w-5 text-zinc-800'} />
     </div>
   );
 }
