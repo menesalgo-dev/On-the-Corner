@@ -23,7 +23,7 @@ interface GnewsResponse {
 }
 
 // Cambiamo il tipo di ritorno della Promise in NewsItemRow[]
-export async function fetchGnews(): Promise<NewsItems[]> {
+export async function fetchGnews(): Promise<NewsItem[]> {
   const apiKey = process.env.GNEWS_API_KEY;
   if (!apiKey) {
     console.warn('[gnews] GNEWS_API_KEY mancante, skip');
