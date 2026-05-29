@@ -1,7 +1,7 @@
 /**
  * lib/news/types.ts
  * Tipi strutturati flessibili per garantire la tolleranza totale tra snake_case e camelCase.
- * Risolve gli errori di type-checking nei moduli esterni (gnews.ts, parser.ts) fungendo da adapter.
+ * Risolve gli errori di type-checking nei moduli esterni (gnews, parser, run-sync) fungendo da adapter.
  */
 
 /** Struttura base rigida del DB news_items (Postgres standard) */
@@ -26,10 +26,9 @@ export interface BaseNewsItemRow {
 
 /**
  * Estensione con i campi camelCase alternativi usati dai vecchi script e scraper esterni.
- * Rendiamo i campi non bloccanti usando Partial, permettendo a gnews.ts e parser.ts di compilare.
+ * Rendiamo i campi non bloccanti usando Partial, permettendo a tutti i moduli di compilare.
  */
 export type NewsItemRow = Partial<BaseNewsItemRow> & {
-  // Campi minimi sempre richiesti per l'identificazione della notizia
   hash: string;
   title: string;
   link: string;
@@ -86,18 +85,50 @@ export function toNewsCardData(row: NewsItemRow): NewsCardData {
 }
 
 /* ==========================================================================
-   UTILITIES DI NORMALIZZAZIONE (Richieste dai moduli scraper/parser)
+   UTILITIES DI NORMALIZZAZIONE E PARSING (Richieste dai moduli esterni)
    ========================================================================== */
 
 /**
- * Rimuove i tag HTML da una stringa di testo (es. descrizione o sommario)
+ * Calcola l'indice di somiglianza (Sørensen–Dice coefficient) tra due stringhe.
+ * Restituisce un valore da 0 (completamente diverse) a 1 (identiche).
+ * Utilizzato da run-sync.ts per il de-duplicare le notizie in ingresso.
+ */
+export function similarity(s1: string, s2: string): number {
+  if (!s1 || !s2) return 0;
+  const str1 = s1.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const str2 = s2.toLowerCase().replace(/[^a-z0-9]/g, '');
+  
+  if (str1 === str2) return 1;
+  if (str1.length < 2 || str2.length < 2) return 0;
+
+  const bigrams1 = new Map<string, number>();
+  for (let i = 0; i < str1.length - 1; i++) {
+    const bigram = str1.substr(i, 2);
+    bigrams1.set(bigram, (bigrams1.get(bigram) || 0) + 1);
+  }
+
+  let intersection = 0;
+  for (let i = 0; i < str2.length - 1; i++) {
+    const bigram = str2.substr(i, 2);
+    const count = bigrams1.get(bigram) || 0;
+    if (count > 0) {
+      bigrams1.set(bigram, count - 1);
+      intersection++;
+    }
+  }
+
+  return (2.0 * intersection) / (str1.length + str2.length - 2);
+}
+
+/**
+ * Rimuove i tag HTML da una stringa di testo
  */
 export function stripHtml(html: string): string {
   if (!html) return '';
   return html
-    .replace(/<[^>]*>/g, '') // Rimuove tutti i tag HTML <...>
-    .replace(/&nbsp;/g, ' ')  // Converte entità spazio vuoto
-    .replace(/&amp;/g, '&')   // Converte entità e commerciale
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .trim();
