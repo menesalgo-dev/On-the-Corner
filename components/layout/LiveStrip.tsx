@@ -92,3 +92,32 @@ export function LiveStrip({ matches = [] }: Props) {
     </section>
   );
 }
+
+/**
+ * Helper per mappare in modo sicuro una riga MatchRow del DB (snake_case)
+ * nell'interfaccia LiveMatch (camelCase) richiesta da questo componente.
+ */
+export function mapMatchRowToLiveMatch(dbMatch: any): LiveMatch {
+  // Sincronizza lo status del db con l'interfaccia della strip
+  let normalizedStatus: 'live' | 'scheduled' | 'finished' = 'scheduled';
+  if (dbMatch.status === 'live') normalizedStatus = 'live';
+  if (dbMatch.status === 'finished') normalizedStatus = 'finished';
+
+  // Capitalizza o formatta la stringa dello sport per la UI
+  const formattedSport = 
+    dbMatch.sport === 'calcio' ? 'Calcio' : 
+    dbMatch.sport === 'basket' ? 'Basket' : 
+    dbMatch.sport ? dbMatch.sport.charAt(0).toUpperCase() + dbMatch.sport.slice(1) : 'Sport';
+
+  return {
+    id: dbMatch.match_key || dbMatch.external_id || String(dbMatch.id || ''),
+    sport: formattedSport,
+    homeTeam: dbMatch.home_team || 'TBD',
+    awayTeam: dbMatch.away_team || undefined,
+    // Se i punteggi sono null (es. partite pianificate), passiamo undefined per non mostrarli nella strip
+    homeScore: dbMatch.home_score !== null && dbMatch.home_score !== undefined ? Number(dbMatch.home_score) : undefined,
+    awayScore: dbMatch.away_score !== null && dbMatch.away_score !== undefined ? Number(dbMatch.away_score) : undefined,
+    minute: dbMatch.minute || undefined,
+    status: normalizedStatus,
+  };
+}
