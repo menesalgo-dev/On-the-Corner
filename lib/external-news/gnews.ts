@@ -5,7 +5,7 @@
  */
 import { categorize } from '@/lib/rss/categorize';
 // Importiamo NewsItemRow al posto di NewsItem che non esiste più
-import { type NewsItemRow, normalizeTitle, normalizeUrl, sha1 } from '@/lib/news/types';
+import { type NewsItems, normalizeTitle, normalizeUrl, sha1 } from '@/lib/news/types';
 
 interface GnewsArticle {
   title: string;
@@ -23,7 +23,7 @@ interface GnewsResponse {
 }
 
 // Cambiamo il tipo di ritorno della Promise in NewsItemRow[]
-export async function fetchGnews(): Promise<NewsItemRow[]> {
+export async function fetchGnews(): Promise<NewsItems[]> {
   const apiKey = process.env.GNEWS_API_KEY;
   if (!apiKey) {
     console.warn('[gnews] GNEWS_API_KEY mancante, skip');
@@ -40,7 +40,7 @@ export async function fetchGnews(): Promise<NewsItemRow[]> {
   );
 
   // Array tipizzato correttamente in NewsItemRow[]
-  const items: NewsItemRow[] = [];
+  const items: NewsItems[] = [];
   const now = Date.now();
 
   for (let i = 0; i < results.length; i++) {
