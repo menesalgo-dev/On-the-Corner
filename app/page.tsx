@@ -11,7 +11,8 @@ import { ArrowRight, Radio, Newspaper } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { LiveStrip } from '@/components/layout/LiveStrip';
+// Importiamo sia il componente che l'helper di mappatura appena creato
+import { LiveStrip, mapMatchRowToLiveMatch } from '@/components/layout/LiveStrip';
 import { SportShortcuts } from '@/components/shared/SportShortcuts';
 import { NewsCard } from '@/components/news/NewsCard';
 import { fetchLatestNews } from '@/lib/news/items';
@@ -70,9 +71,9 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* LIVESTRIP */}
+        {/* LIVESTRAP - Adesso i match vengono mappati in modo sicuro da MatchRow[] a LiveMatch[] */}
         <section className="mb-6">
-          <LiveStrip matches={liveMatches} />
+          <LiveStrip matches={liveMatches?.map(mapMatchRowToLiveMatch)} />
         </section>
 
         {/* CTA verso /live */}
@@ -93,61 +94,4 @@ export default async function HomePage() {
                 <p className="text-xs text-zinc-400">Vai al calendario completo</p>
               </div>
             </div>
-            <ArrowRight className="h-5 w-5 text-[#e8c800]" />
-          </Link>
-        )}
-
-        {/* Shortcuts sport */}
-        <section className="mb-6">
-          <SportShortcuts />
-        </section>
-
-        {/* In evidenza — 4 card piccole */}
-        {evidenza.length > 0 && (
-          <section className="mb-6">
-            <header className="mb-3 flex items-baseline justify-between">
-              <h2
-                className="text-sm uppercase tracking-tight text-white"
-                style={{ fontFamily: 'var(--font-archivo-black)' }}
-              >
-                In evidenza
-              </h2>
-              <Link
-                href="/news"
-                className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-zinc-500 transition hover:text-[#e8c800]"
-                style={{ fontFamily: 'var(--font-dm-mono)' }}
-              >
-                Archivio news <ArrowRight className="h-3 w-3" />
-              </Link>
-            </header>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {evidenza.map((n) => (
-                <NewsCard key={n.id} news={n} variant="default" />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* CTA finale verso /news */}
-        <Link
-          href="/news"
-          className="flex items-center justify-between rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] p-4 transition hover:border-[#e8c800]/40"
-        >
-          <div className="flex items-center gap-3">
-            <Newspaper className="h-5 w-5 text-zinc-400" />
-            <div>
-              <p className="text-sm text-white">Cerchi una notizia?</p>
-              <p className="text-xs text-zinc-500">
-                Apri l&apos;archivio con filtri per categoria, fonte e data
-              </p>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 text-zinc-500" />
-        </Link>
-      </main>
-
-      <Footer />
-      <BottomNav liveCount={counts.live} />
-    </>
-  );
-}
+            <ArrowRight className="h-5 w-5 text-
