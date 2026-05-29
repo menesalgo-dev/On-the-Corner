@@ -1,13 +1,19 @@
 /**
  * server/sync/run-sync.ts
- * Pipeline completa di sync allineata al database (Solo notizie in lingua Italiana).
- * Adattata per digerire sia i flussi Edge Function (snake_case) che i feed storici.
+ * Pipeline completa di sync allineata al database.
  */
 import { createClient } from '@supabase/supabase-js';
 import { fetchAllRssNews } from '@/lib/rss/parser';
 import { fetchNewsApi } from '@/lib/external-news/newsapi';
 import { fetchGuardian } from '@/lib/external-news/guardian';
 import { fetchGnews } from '@/lib/external-news/gnews';
+import { balanceByLanguage } from '@/lib/rss/categorize';
+import {
+  BALANCE_LANG_THRESHOLD_IT,
+  BALANCE_LANG_EN_CAP_PCT,
+  DEDUP_TITLE_SIM_THRESHOLD,
+  MAX_AGE_DAYS_IT,
+} from '@/lib/rss/config';
 import { similarity, normalizeTitle, type NewsItem } from '@/lib/news/types';
 
 export interface SyncResult {
@@ -31,15 +37,10 @@ export interface SyncResult {
 }
 
 function deduplicate(items: NewsItem[]): NewsItem[] {
-  const sorted = [...items].sort((a, b) => {
-    const priorityA = a.priority ?? 50;
-    const priorityB = b.priority ?? 50;
-    
-    const dateA = Date.parse(a.publishedAt || a.published_at || new Date().toISOString());
-    const dateB = Date.parse(b.publishedAt || b.published_at || new Date().toISOString());
-    
-    return priorityA - priorityB || dateB - dateA;
-  });
+  const sorted = [...items].sort((a, b) =>
+    a.priority - b.priority ||
+    Date.parse(b.publishedAt) - Date.parse(a.publishedAt),
+  );
 
   const kept: NewsItem[] = [];
   const seenHashes = new Set<string>();
@@ -56,7 +57,7 @@ function deduplicate(items: NewsItem[]): NewsItem[] {
     if (!duplicate) {
       for (const existing of titleIndex) {
         if (Math.abs(existing.norm.length - norm.length) > 25) continue;
-        if (similarity(existing.norm, norm) >= 0.6) { 
+        if (similarity(existing.norm, norm) >= DEDUP_TITLE_SIM_THRESHOLD) {
           duplicate = true;
           break;
         }
@@ -88,27 +89,27 @@ interface NewsRow {
   link: string;
   description: string | null;
   image_url: string | null;
-  lang: 'it'; 
+  lang: 'it' | 'en';
   priority: number;
   published_at: string;
-  tags: string[]; 
+  tags: string[]; // ✅ Ripristinato array di stringhe nativo
   category_id: string;
 }
 
 function toRow(n: NewsItem): NewsRow {
   return {
     hash: n.hash,
-    source_id: n.sourceId || n.source_id || 'rss',
-    source_name: n.sourceName || n.source_name || 'On The Corner',
+    source_id: n.sourceId || 'rss',
+    source_name: n.sourceName,
     title: n.title.slice(0, 500),
     link: n.link,
     description: n.description ? n.description.slice(0, 1000) : null,
-    image_url: n.imageUrl || n.image_url || null,
-    lang: 'it', 
-    priority: n.priority ?? 50,
-    published_at: n.publishedAt || n.published_at || new Date().toISOString(),
-    tags: n.tags || [], 
-    category_id: n.categoryId || n.category_id || 'altro',
+    image_url: n.imageUrl || null,
+    lang: n.lang || 'it',
+    priority: n.priority || 50,
+    published_at: n.publishedAt || new Date().toISOString(),
+    tags: n.tags || [], // ✅ Passato come array nativo per evitare l'errore malformed array literal
+    category_id: n.categoryId || 'altro',
   };
 }
 
@@ -144,7 +145,7 @@ export async function runSync(): Promise<SyncResult> {
   const supabase = createClient(supaUrl, serviceRole);
 
   const [rssResult, newsapi, guardian, gnews] = await Promise.all([
-    fetchAllRssNews().catch(() => ({ items: [], perSource: {}, failed: [] })),
+    fetchAllRssNews(),
     fetchNewsApi().catch(() => []),
     fetchGuardian().catch(() => []),
     fetchGnews().catch(() => []),
@@ -159,46 +160,26 @@ export async function runSync(): Promise<SyncResult> {
   };
   fetched.total = fetched.rss + fetched.newsapi + fetched.guardian + fetched.gnews;
 
-  const allItems: NewsItem[] = [...rssResult.items, ...newsapi, ...guardian, ...gnews]
-    .filter(item => item && item.title && (item.lang || (item as any).lang) !== 'en') 
-    .map(item => ({
-      ...item,
-      lang: 'it'
-    }));
-
+  const allItems = [...rssResult.items, ...newsapi, ...guardian, ...gnews];
   const deduped = deduplicate(allItems);
-  const balanced = [...deduped];
+  const balanced = balanceByLanguage(deduped, BALANCE_LANG_THRESHOLD_IT, BALANCE_LANG_EN_CAP_PCT);
 
-  balanced.sort((a, b) => {
-    const priorityA = a.priority ?? 50;
-    const priorityB = b.priority ?? 50;
-    
-    const dateA = Date.parse(a.publishedAt || a.published_at || new Date().toISOString());
-    const dateB = Date.parse(b.publishedAt || b.published_at || new Date().toISOString());
-    
-    return priorityA - priorityB || dateB - dateA;
-  });
+  balanced.sort((a, b) => a.priority - b.priority || Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 
   const perCategory: Record<string, number> = {};
-  const perSource: Record<string, number> = { ...rssResult.perSource };
-  
+  const perSource = { ...rssResult.perSource };
   balanced.forEach((i) => {
-    const catId = i.categoryId || i.category_id || 'altro';
-    const srcId = i.sourceId || i.source_id || 'rss';
-    
-    perCategory[catId] = (perCategory[catId] ?? 0) + 1;
-    if (!perSource[srcId]) perSource[srcId] = 0;
-    perSource[srcId]! += 1;
+    perCategory[i.categoryId] = (perCategory[i.categoryId] ?? 0) + 1;
+    if (!perSource[i.sourceId]) perSource[i.sourceId] = 0;
+    perSource[i.sourceId]! += 1;
   });
 
   const rows = balanced.map(toRow);
   let upserted = 0;
-
   for (const batch of chunk(rows, 200)) {
     const { error, count } = await supabase
       .from('news_items')
       .upsert(batch as never, { onConflict: 'hash', count: 'exact', ignoreDuplicates: false });
-    
     if (error) {
       return {
         ok: false,
@@ -217,7 +198,7 @@ export async function runSync(): Promise<SyncResult> {
     upserted += count ?? batch.length;
   }
 
-  const threshold = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const threshold = new Date(Date.now() - (MAX_AGE_DAYS_IT + 2) * 86_400_000).toISOString();
   let deleted = 0;
   try {
     const { count } = await supabase
