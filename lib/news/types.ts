@@ -1,11 +1,17 @@
 /**
  * lib/news/types.ts
- * Tipi strutturati flessibili per garantire la tolleranza totale tra snake_case e camelCase.
- * Contiene le utility di normalizzazione integrate per evitare dipendenze incrociate.
+ * Tipi snake_case allineati al DB Postgres e al codice esistente.
+ *
+ * NewsItemRow è il tipo "grezzo" del DB.
+ * NewsCardData è il tipo usato dai componenti NewsCard, BookmarkButton, ecc.
+ * Sono praticamente identici, ma NewsCardData è specifico per UI (immutabile).
+ *
+ * toNewsCardData mantiene retrocompatibilità: alcuni file vecchi possono
+ * ancora chiamarla; restituisce semplicemente lo stesso oggetto.
  */
 
-/** Struttura base rigida del DB news_items (Postgres standard) */
-export interface BaseNewsItemRow {
+/** Riga DB news_items (snake_case Postgres). */
+export interface NewsItemRow {
   id: string;
   hash: string;
   source_id: string | null;
@@ -15,7 +21,7 @@ export interface BaseNewsItemRow {
   description: string | null;
   image_url: string | null;
   lang: string;
-  priority: number; // Forzato numerico per evitare errori logici e NaN nei cicli .sort()
+  priority: number | null;
   published_at: string;
   tags: string[] | null;
   category_id: string;
@@ -25,37 +31,8 @@ export interface BaseNewsItemRow {
 }
 
 /**
- * Tipo esteso per gli scraper esterni (gnews, parser).
- * Unisce i campi base del database con le proprietà camelCase alternative.
- */
-export type ExtendedNewsFields = {
-  hash: string;
-  title: string;
-  link: string;
-  priority: number; 
-} & Partial<{
-  id: string;
-  sourceId: string | null;
-  sourceName: string | null;
-  imageUrl: string | null;
-  publishedAt: string; 
-  categoryId: string | null;
-  lang: string;
-  tags: string[] | null;
-}>;
-
-/**
- * Esportazione combinata finale del Tipo per il DB e gli scraper.
- */
-export type NewsItemRow = Partial<Omit<BaseNewsItemRow, 'priority'>> & ExtendedNewsFields;
-
-/**
- * Alias di tipo per mantenere la piena retrocompatibilità.
- */
-export type NewsItem = NewsItemRow;
-
-/**
- * Dati flessibili passati ai componenti d'interfaccia (NewsCard, Detail Page, ecc.)
+ * Dati passati ai componenti card.
+ * Stesso schema di NewsItemRow ma con campi opzionali UI.
  */
 export interface NewsCardData {
   id: string;
@@ -63,113 +40,28 @@ export interface NewsCardData {
   link: string;
   description: string | null;
   image_url: string | null;
-  imageUrl?: string | null;
   source_name: string;
-  sourceName?: string;
   published_at: string;
-  publishedAt?: string;
   category_id?: string | null;
-  categoryId?: string | null;
   category_name?: string | null;
   category_emoji?: string | null;
 }
 
 /**
- * Adapter — Mappa i dati in modo intelligente popolando ENTRAMBI i formati (snake e camel).
+ * Adapter — convertito in identity function dato che gli schemi sono già allineati.
+ * Mantenuto per non rompere le import esistenti in app/fantacalcio, app/news/[id], ecc.
  */
-export function toNewsCardData(row: any): NewsCardData {
-  const img = row.image_url || row.imageUrl || null;
-  const src = row.source_name || row.sourceName || 'On The Corner';
-  const pub = row.published_at || row.publishedAt || new Date().toISOString();
-  const catId = row.category_id || row.categoryId || 'generale';
-
+export function toNewsCardData(row: NewsItemRow): NewsCardData {
   return {
-    id: row.id || row.hash || '', 
-    title: row.title || '',
-    link: row.link || '',
-    description: row.description || null,
+    id: row.id,
+    title: row.title,
+    link: row.link,
+    description: row.description,
+    image_url: row.image_url,
+    source_name: row.source_name ?? '',
+    published_at: row.published_at,
+    category_id: row.category_id,
     category_name: row.category_name ?? null,
     category_emoji: row.category_emoji ?? null,
-    
-    image_url: img,
-    imageUrl: img,
-    source_name: src,
-    sourceName: src,
-    published_at: pub,
-    publishedAt: pub,
-    category_id: catId,
-    categoryId: catId
   };
-}
-
-/* ==========================================================================
-   UTILITIES DI NORMALIZZAZIONE INTEGRATE (Risolve definitivamente run-sync, gnews, parser)
-   ========================================================================== */
-
-export function similarity(s1: string, s2: string): number {
-  if (!s1 || !s2) return 0;
-  const str1 = s1.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const str2 = s2.toLowerCase().replace(/[^a-z0-9]/g, '');
-  
-  if (str1 === str2) return 1;
-  if (str1.length < 2 || str2.length < 2) return 0;
-
-  const bigrams1 = new Map<string, number>();
-  for (let i = 0; i < str1.length - 1; i++) {
-    const bigram = str1.substr(i, 2);
-    bigrams1.set(bigram, (bigrams1.get(bigram) || 0) + 1);
-  }
-
-  let intersection = 0;
-  for (let i = 0; i < str2.length - 1; i++) {
-    const bigram = str2.substr(i, 2);
-    const count = bigrams1.get(bigram) || 0;
-    if (count > 0) {
-      bigrams1.set(bigram, count - 1);
-      intersection++;
-    }
-  }
-
-  return (2.0 * intersection) / (str1.length + str2.length - 2);
-}
-
-export function stripHtml(html: string): string {
-  if (!html) return '';
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .trim();
-}
-
-export function normalizeTitle(title: string): string {
-  if (!title) return '';
-  return title.trim().replace(/\s+/g, ' ');
-}
-
-export function normalizeUrl(url: string): string {
-  if (!url) return '';
-  try {
-    const parsed = new URL(url);
-    return `${parsed.origin}${parsed.pathname}`.toLowerCase().replace(/\/$/, '');
-  } catch {
-    return url.trim().toLowerCase().replace(/\/$/, '');
-  }
-}
-
-export function sha1(str: string): string {
-  try {
-    const crypto = require('crypto');
-    return crypto.createHash('sha1').update(str).digest('hex');
-  } catch {
-    let block1 = 0, block2 = 0;
-    for (let i = 0; i < str.length; i++) {
-      const ch = str.charCodeAt(i);
-      block1 = (block1 * 31 + ch) | 0;
-      block2 = (block2 * 37 + ch) | 0;
-    }
-    return Math.abs(block1).toString(16) + Math.abs(block2).toString(16);
-  }
 }
