@@ -1,16 +1,16 @@
 /**
- * components/layout/Header.tsx
- * Header sticky Premium Minimal.
- * Modifica: rimossa voce "Archivio" che dava 404.
+ * components/layout/Header.tsx v3
+ *
+ * Mobile-first minimal: solo logo + search + profilo.
+ * La nav primaria sta nel BottomNav fisso. Hamburger rimosso.
+ * Su desktop la nav resta inline.
  */
 import React from 'react';
 import Link from 'next/link';
-import { Search } from 'lucide-react';
+import { Search, User } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { createClient } from '@/lib/supabase/server';
-import { MobileMenu } from './MobileMenu';
 
-// 🛠️ AGGIORNAMENTO NAV: rimossa voce "Archivio" (404)
 const NAV_LINKS = [
   { href: '/news', label: 'Notizie' },
   { href: '/live', label: 'Live' },
@@ -29,12 +29,15 @@ export async function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-otc-line bg-otc-bg/80 backdrop-blur-lg">
-      <div className="mx-auto flex max-w-[1340px] items-center gap-3 px-5 py-2.5 sm:px-6">
+    <header className="sticky top-0 z-30 border-b border-otc-line bg-otc-bg/90 backdrop-blur-md">
+      <div className="mx-auto flex max-w-[1340px] items-center gap-4 px-4 py-3 sm:px-6">
+        {/* Logo cliccabile */}
         <Link href="/" className="shrink-0 transition-opacity hover:opacity-90">
-          <Logo size={28} compact />
+          <Logo size={26} compact />
         </Link>
-        <nav className="ml-8 hidden items-center gap-1 lg:flex">
+
+        {/* Nav inline solo desktop */}
+        <nav className="ml-6 hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
@@ -45,15 +48,37 @@ export async function Header() {
             </Link>
           ))}
         </nav>
+
         <div className="flex-1" />
+
+        {/* Search compatta */}
         <Link
           href="/search"
           aria-label="Cerca"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-otc-line bg-otc-surface p-1.5 text-zinc-400 transition hover:border-otc-accent/30 hover:text-otc-accent"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-otc-line bg-otc-surface text-zinc-400 transition hover:border-otc-accent/30 hover:text-otc-accent"
         >
-          <Search className="h-3.5 w-3.5" />
+          <Search className="h-4 w-4" />
         </Link>
+
+        {/* Profilo / Inizia */}
         {userEmail ? (
+          <Link
+            href="/profile"
+            aria-label="Profilo"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-otc-line bg-otc-surface text-zinc-400 transition hover:border-otc-accent/30 hover:text-otc-accent sm:hidden"
+          >
+            <User className="h-4 w-4" />
+          </Link>
+        ) : (
+          <Link
+            href="/signup"
+            className="hidden rounded-lg bg-otc-accent px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-black transition hover:opacity-90 sm:inline-flex"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            Inizia
+          </Link>
+        )}
+        {userEmail && (
           <Link
             href="/profile"
             className="hidden rounded-lg bg-otc-accent px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-black transition hover:opacity-90 sm:inline-flex"
@@ -61,24 +86,16 @@ export async function Header() {
           >
             Profilo
           </Link>
-        ) : (
-          <div className="hidden items-center gap-4 sm:flex">
-            <Link
-              href="/login"
-              className="text-xs font-semibold tracking-wider text-zinc-400 transition hover:text-otc-accent"
-            >
-              Accedi
-            </Link>
-            <Link
-              href="/signup"
-              className="rounded-lg bg-otc-accent px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-black transition hover:opacity-90"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              Inizia
-            </Link>
-          </div>
         )}
-        <MobileMenu navLinks={NAV_LINKS} isLoggedIn={!!userEmail} />
+        {!userEmail && (
+          <Link
+            href="/login"
+            aria-label="Accedi"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-otc-line bg-otc-surface text-zinc-400 transition hover:border-otc-accent/30 hover:text-otc-accent sm:hidden"
+          >
+            <User className="h-4 w-4" />
+          </Link>
+        )}
       </div>
     </header>
   );
