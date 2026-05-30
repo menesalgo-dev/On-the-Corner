@@ -1,284 +1,203 @@
 /**
- * app/live/page.tsx
- * Sezione eventi stile SofaScore:
- *  - Header con totali (live ora + programmati oggi)
- *  - Navigatore date orizzontale
- *  - Filtro sport (Tutti / Calcio / Basket)
- *  - Sezioni separate: 🔴 Live ora, ⏰ Programmati, ✓ Terminati, ⏸ Rinviati
- *  - Match raggruppati per competizione dentro ogni sezione
- *  - Empty state intelligente per data senza match
+ * app/live/page.tsx — Live v3
+ *
+ * Layout:
+ *  1. Breadcrumb
+ *  2. Titolo + counter status (LIVE rosso, programmati gialli)
+ *  3. Date strip 7 giorni
+ *  4. Sport filter chips (Tutti / Calcio / Basket / Tennis / ...)
+ *  5. Lista match raggruppati per competition
+ *
+ * Se nessun match per data selezionata, mostra suggerimenti vicini
+ * (prossimo giorno con match) invece di empty state piatto.
  */
-import Link from 'next/link'
-import { Radio, Clock, Check, Pause, Calendar as CalIcon } from 'lucide-react'
-import { Header } from '@/components/layout/Header'
-import { Footer } from '@/components/layout/Footer'
-import { BottomNav } from '@/components/layout/BottomNav'
-import { MatchCard } from '@/components/match/MatchCard'
-import { MatchDateNav } from '@/components/match/MatchDateNav'
-import { EmptyState } from '@/components/shared/EmptyState'
-import { fetchMatchesByDate, fetchMatchCountsByStatus } from '@/lib/sports/matches'
-import type { MatchRow } from '@/lib/sports/types'
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { Home as HomeIcon, Radio, Calendar, AlertCircle } from 'lucide-react';
+import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
+import { BottomNav } from '@/components/layout/BottomNav';
+import { DateStrip } from '@/components/sports/DateStrip';
+import { SportTabs } from '@/components/sports/SportTabs';
+import { MatchList } from '@/components/sports/MatchList';
+import { fetchMatchesByDate, fetchMatchCountsByStatus } from '@/lib/sports/matches';
 
-export const revalidate = 60
-
-export const metadata = {
-  title: 'Live & Calendario partite',
-  description: 'Calendario partite calcio e basket, risultati live in tempo reale.',
-}
+export const revalidate = 60;
 
 interface PageProps {
-  searchParams: Promise<{ date?: string; sport?: string }>
+  searchParams: Promise<{ date?: string; sport?: string }>;
+}
+
+export const metadata = {
+  title: 'Live — On The Corner',
+  description: 'Partite e match sportivi in tempo reale.',
+};
+
+function getTodayIso(): string {
+  const now = new Date();
+  // Aggiungi offset Italia per il "today" giusto (UTC+1/+2)
+  now.setUTCHours(now.getUTCHours() + 2);
+  return now.toISOString().slice(0, 10);
 }
 
 export default async function LivePage({ searchParams }: PageProps) {
-  const params = await searchParams
-  const today = new Date().toISOString().slice(0, 10)
-  const activeDate = params.date ?? today
-  const sportFilter = params.sport
+  const params = await searchParams;
+  const dateIso = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : getTodayIso();
+  const sportFilter = params.sport;
 
-  const [matchesRaw, counts] = await Promise.all([
-    fetchMatchesByDate(activeDate),
+  const [matches, counts] = await Promise.all([
+    fetchMatchesByDate(dateIso),
     fetchMatchCountsByStatus(),
-  ])
+  ]);
 
-  const matches = sportFilter ? matchesRaw.filter(m => m.sport === sportFilter) : matchesRaw
+  // Filtra per sport
+  const filteredMatches = sportFilter
+    ? matches.filter((m) => m.sport === sportFilter)
+    : matches;
 
-  const live = matches.filter(m => m.status === 'live')
-  const scheduled = matches.filter(m => m.status === 'scheduled')
-  const finished = matches.filter(m => m.status === 'finished')
-  const postponed = matches.filter(m => m.status === 'postponed')
+  // Lista sport disponibili nella data selezionata
+  const sportsInDate = Array.from(new Set(matches.map((m) => m.sport))).sort();
 
-  const isToday = activeDate === today
-  const dateLabel = formatDateLabel(activeDate, isToday)
+  // Conteggi per status nei match della data
+  const liveInDate = matches.filter((m) => m.status === 'live').length;
+  const scheduledInDate = matches.filter((m) => m.status === 'scheduled').length;
+  const finishedInDate = matches.filter((m) => m.status === 'finished').length;
+
+  const isToday = dateIso === getTodayIso();
 
   return (
     <>
       <Header />
 
-      <main className="mx-auto max-w-[1100px] px-4 pb-24 pt-6 sm:px-6 sm:pb-12">
-        {/* Header pagina */}
-        <header className="mb-2 flex items-baseline justify-between">
-          <h1
-            className="text-2xl uppercase tracking-tight sm:text-4xl"
-            style={{ fontFamily: 'var(--font-archivo-black)' }}
+      <main className="mx-auto max-w-[1100px] px-4 pb-24 pt-4 sm:px-6 sm:pb-12 sm:pt-8">
+        {/* Breadcrumb */}
+        <nav className="mb-3 flex items-center gap-2 text-xs">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 text-zinc-500 transition hover:text-otc-accent"
           >
-            Live<span className="text-[#e8c800]">.</span>
-          </h1>
-          <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest" style={{ fontFamily: 'var(--font-dm-mono)' }}>
-            {counts.live > 0 && (
-              <span className="inline-flex items-center gap-1 text-red-400">
-                <span
-                  className="h-1.5 w-1.5 rounded-full bg-red-500"
-                  style={{ animation: 'pulse-dot 1.6s ease-in-out infinite' }}
-                />
-                {counts.live} live
+            <HomeIcon className="h-3.5 w-3.5" />
+            Home
+          </Link>
+          <span className="text-zinc-700">/</span>
+          <span
+            className="uppercase tracking-widest text-zinc-300"
+            style={{ fontFamily: 'var(--font-dm-mono)' }}
+          >
+            Live
+          </span>
+        </nav>
+
+        {/* Titolo + status counters */}
+        <header className="mb-5 flex items-end justify-between gap-3">
+          <div>
+            <h1
+              className="text-3xl uppercase tracking-tight text-white sm:text-5xl"
+              style={{ fontFamily: 'var(--font-archivo-black)', letterSpacing: '-0.02em' }}
+            >
+              Live<span className="text-otc-accent">.</span>
+            </h1>
+            <p
+              className="mt-1 text-[10px] uppercase tracking-[0.2em] text-zinc-500"
+              style={{ fontFamily: 'var(--font-dm-mono)' }}
+            >
+              {isToday ? 'Oggi' : `Calendario ${dateIso}`}
+            </p>
+          </div>
+
+          {/* Status pills */}
+          <div className="flex gap-1.5">
+            {liveInDate > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[10px] uppercase tracking-widest text-red-400"
+                style={{ fontFamily: 'var(--font-dm-mono)' }}>
+                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                {liveInDate} live
               </span>
             )}
-            <span className="text-zinc-500">{matches.length} match · {dateLabel}</span>
+            {scheduledInDate > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-otc-accent/30 bg-otc-accent/10 px-2.5 py-1 text-[10px] uppercase tracking-widest text-otc-accent"
+                style={{ fontFamily: 'var(--font-dm-mono)' }}>
+                {scheduledInDate} prog
+              </span>
+            )}
+            {finishedInDate > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-otc-line bg-otc-surface px-2.5 py-1 text-[10px] uppercase tracking-widest text-zinc-500"
+                style={{ fontFamily: 'var(--font-dm-mono)' }}>
+                {finishedInDate} fin
+              </span>
+            )}
           </div>
         </header>
 
-        {/* Navigatore date */}
-        <MatchDateNav activeDate={activeDate} />
+        {/* Date strip 7 giorni */}
+        <DateStrip activeDate={dateIso} />
 
-        {/* Filtro sport */}
-        <SportFilter activeSport={sportFilter} activeDate={activeDate} today={today} />
+        {/* Sport tabs (solo se ci sono match nella data) */}
+        {sportsInDate.length > 1 && (
+          <SportTabs activeSport={sportFilter} sports={sportsInDate} date={dateIso} />
+        )}
 
-        {/* Contenuto */}
-        {matches.length === 0 ? (
-          <EmptyStateMatches isToday={isToday} dateLabel={dateLabel} hasSport={!!sportFilter} />
+        {/* Lista match o empty intelligent */}
+        {filteredMatches.length === 0 ? (
+          <EmptyMatches dateIso={dateIso} sportFilter={sportFilter} />
         ) : (
-          <div className="space-y-7">
-            {live.length > 0 && (
-              <MatchSection
-                label="Live ora"
-                icon={<Radio className="h-4 w-4 text-red-500" style={{ animation: 'pulse-dot 1.6s ease-in-out infinite' }} />}
-                color="red"
-                matches={live}
-              />
-            )}
-            {scheduled.length > 0 && (
-              <MatchSection
-                label="Programmati"
-                icon={<Clock className="h-4 w-4 text-[#e8c800]" />}
-                color="yellow"
-                matches={scheduled}
-              />
-            )}
-            {finished.length > 0 && (
-              <MatchSection
-                label="Terminati"
-                icon={<Check className="h-4 w-4 text-zinc-400" />}
-                color="gray"
-                matches={finished}
-              />
-            )}
-            {postponed.length > 0 && (
-              <MatchSection
-                label="Rinviati"
-                icon={<Pause className="h-4 w-4 text-orange-400" />}
-                color="orange"
-                matches={postponed}
-              />
-            )}
-          </div>
+          <MatchList matches={filteredMatches} />
         )}
       </main>
 
       <Footer />
-      <BottomNav />
+      <BottomNav liveCount={counts.live} />
     </>
-  )
+  );
 }
 
 /* ============================================================
- * Sezione match raggruppati per competizione
+ * Empty intelligente
  * ============================================================ */
-function MatchSection({
-  label, icon, color, matches,
-}: {
-  label: string
-  icon: React.ReactNode
-  color: 'red' | 'yellow' | 'gray' | 'orange'
-  matches: MatchRow[]
-}) {
-  const colorClasses: Record<typeof color, string> = {
-    red: 'bg-red-500/15 text-red-400',
-    yellow: 'bg-[#e8c800]/15 text-[#e8c800]',
-    gray: 'bg-zinc-500/15 text-zinc-400',
-    orange: 'bg-orange-500/15 text-orange-400',
-  }
-
-  // Raggruppa per competizione
-  const byComp = new Map<string, MatchRow[]>()
-  for (const m of matches) {
-    const key = m.competition ?? 'Altro'
-    const arr = byComp.get(key) ?? []
-    arr.push(m)
-    byComp.set(key, arr)
-  }
-  const sortedComps = Array.from(byComp.entries()).sort((a, b) => b[1].length - a[1].length)
+function EmptyMatches({ dateIso, sportFilter }: { dateIso: string; sportFilter?: string }) {
+  const isToday = dateIso === getTodayIso();
 
   return (
-    <section>
-      <header className="mb-3 flex items-center gap-2">
-        <span className="shrink-0">{icon}</span>
-        <h2
-          className="text-sm uppercase tracking-tight text-white sm:text-base"
+    <div className="mt-6 rounded-2xl border border-otc-line bg-otc-surface p-8 text-center sm:p-12">
+      <div className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-otc-accent/10">
+        <Calendar className="h-6 w-6 text-otc-accent" />
+      </div>
+      <h2
+        className="text-lg uppercase tracking-tight text-white sm:text-xl"
+        style={{ fontFamily: 'var(--font-archivo-black)' }}
+      >
+        {sportFilter ? `Nessun match di ${sportFilter}` : 'Nessun match'}
+      </h2>
+      <p className="mt-2 text-sm text-zinc-400">
+        {isToday
+          ? 'Oggi non ci sono partite in calendario. Controlla i prossimi giorni.'
+          : 'Per questa data non ci sono partite. Prova un altro giorno.'}
+      </p>
+
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {sportFilter && (
+          <Link
+            href={`/live?date=${dateIso}`}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-otc-line bg-otc-bg px-4 py-2 text-xs uppercase tracking-wider text-zinc-400 transition hover:border-otc-accent/40 hover:text-otc-accent"
+            style={{ fontFamily: 'var(--font-dm-mono)' }}
+          >
+            Tutti gli sport
+          </Link>
+        )}
+        <Link
+          href={`/live?date=${nextDay(dateIso)}`}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-otc-accent px-4 py-2 text-xs uppercase tracking-wider text-black"
           style={{ fontFamily: 'var(--font-archivo-black)' }}
         >
-          {label}
-        </h2>
-        <span
-          className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${colorClasses[color]}`}
-          style={{ fontFamily: 'var(--font-dm-mono)' }}
-        >
-          {matches.length}
-        </span>
-      </header>
-
-      <div className="space-y-5">
-        {sortedComps.map(([comp, items]) => (
-          <div key={comp}>
-            {sortedComps.length > 1 && (
-              <h3
-                className="mb-2 text-[10px] uppercase tracking-widest text-zinc-500"
-                style={{ fontFamily: 'var(--font-dm-mono)' }}
-              >
-                {comp}
-                <span className="ml-2 text-zinc-700">({items.length})</span>
-              </h3>
-            )}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {items.map(m => <MatchCard key={m.id} match={m} />)}
-            </div>
-          </div>
-        ))}
+          → Vedi domani
+        </Link>
       </div>
-    </section>
-  )
+    </div>
+  );
 }
 
-/* ============================================================
- * Filtro sport
- * ============================================================ */
-function SportFilter({
-  activeSport, activeDate, today,
-}: { activeSport?: string; activeDate: string; today: string }) {
-  const base = activeDate === today ? '/live' : `/live?date=${activeDate}`
-  const withSport = (s: string) =>
-    activeDate === today ? `/live?sport=${s}` : `/live?date=${activeDate}&sport=${s}`
-
-  const sports: { id: string | undefined; label: string; emoji: string }[] = [
-    { id: undefined, label: 'Tutti', emoji: '🏆' },
-    { id: 'calcio', label: 'Calcio', emoji: '⚽' },
-    { id: 'basket', label: 'Basket', emoji: '🏀' },
-  ]
-
-  return (
-    <nav className="mb-5 flex gap-2 overflow-x-auto scrollbar-hide">
-      {sports.map(s => {
-        const active = s.id === activeSport
-        const href = s.id ? withSport(s.id) : base
-        return (
-          <Link
-            key={s.id ?? 'all'}
-            href={href}
-            className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition ${
-              active
-                ? 'border-[#e8c800] bg-[#e8c800] text-black'
-                : 'border-[#1f1f1f] bg-[#0d0d0d] text-zinc-400 hover:border-[#e8c800]/40 hover:text-[#e8c800]'
-            }`}
-          >
-            <span className="mr-1">{s.emoji}</span>{s.label}
-          </Link>
-        )
-      })}
-    </nav>
-  )
-}
-
-/* ============================================================
- * Empty state intelligente
- * ============================================================ */
-function EmptyStateMatches({
-  isToday, dateLabel, hasSport,
-}: { isToday: boolean; dateLabel: string; hasSport: boolean }) {
-  if (hasSport) {
-    return (
-      <EmptyState
-        emoji="🔍"
-        title="Nessun match per questo sport"
-        description={`Nessuna partita per questo sport ${dateLabel.toLowerCase()}. Prova un altro filtro o un'altra data.`}
-        actionLabel="Mostra tutti"
-        actionHref={isToday ? '/live' : `/live`}
-      />
-    )
-  }
-  return (
-    <EmptyState
-      emoji={isToday ? '⏰' : '📅'}
-      title={isToday ? 'Nessun match oggi' : `Nessun match ${dateLabel.toLowerCase()}`}
-      description={
-        isToday
-          ? "Non ci sono partite in programma oggi. Esplora i prossimi giorni nel calendario."
-          : 'Nessuna partita programmata in questa data. Prova un altro giorno.'
-      }
-      actionLabel={isToday ? 'Vedi domani' : 'Vai a oggi'}
-      actionHref={isToday ? `/live?date=${tomorrowIso()}` : '/live'}
-    />
-  )
-}
-
-function tomorrowIso(): string {
-  const d = new Date(Date.now() + 86_400_000)
-  return d.toISOString().slice(0, 10)
-}
-
-function formatDateLabel(iso: string, isToday: boolean): string {
-  if (isToday) return 'Oggi'
-  const d = new Date(`${iso}T12:00:00Z`)
-  return d.toLocaleDateString('it-IT', {
-    weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome',
-  })
+function nextDay(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
 }
