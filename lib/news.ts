@@ -1,7 +1,10 @@
 /**
  * lib/news.ts
  * Funzioni di interazione diretta con la tabella news_items.
- * Modifica: rimossa categoria "fantacalcio" dalla lista fetchCategories.
+ *
+ * Fix v2:
+ *  - fetchNewsByHash accetta SIA id (UUID) SIA hash (SHA-256)
+ *  - Rimossa categoria "fantacalcio" dai menu visibili
  */
 import { createClient } from '@supabase/supabase-js';
 
@@ -16,8 +19,8 @@ if (!supaUrl || !supaKey) {
 export const supabaseServer = createClient(supaUrl, supaKey, {
   auth: {
     persistSession: false,
-    autoRefreshToken: false
-  }
+    autoRefreshToken: false,
+  },
 });
 
 interface FetchNewsParams {
@@ -66,17 +69,37 @@ export async function getNewsItems({ category, source, page = 1, limit = 20 }: F
   }
 }
 
-/** Recupera una singola notizia tramite hash */
-export async function fetchNewsByHash(hash: string) {
+/**
+ * 🔧 FIX 404: recupera notizia per id (UUID) OPPURE hash (SHA-256).
+ * Il NewsCard usa news.id nei link, ma il vecchio codice cercava per hash.
+ * Adesso prova prima per id, se non trova, fallback su hash.
+ */
+export async function fetchNewsByHash(idOrHash: string) {
+  if (!idOrHash) return null;
+
   try {
+    // Heuristic: UUID = 36 caratteri con i trattini, hash SHA-256 = 64 caratteri esadecimali
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrHash);
+    const lookupColumn = isUuid ? 'id' : 'hash';
+
     const { data, error } = await supabaseServer
       .from('news_items')
       .select('*')
-      .eq('hash', hash)
+      .eq(lookupColumn, idOrHash)
       .maybeSingle();
 
     if (error) throw error;
-    return data;
+    if (data) return data;
+
+    // Fallback: se non ha trovato per id/hash, prova l'altra colonna
+    const fallbackColumn = isUuid ? 'hash' : 'id';
+    const { data: data2 } = await supabaseServer
+      .from('news_items')
+      .select('*')
+      .eq(fallbackColumn, idOrHash)
+      .maybeSingle();
+
+    return data2;
   } catch (err: any) {
     console.error(`❌ Errore in fetchNewsByHash:`, err.message);
     return null;
@@ -86,10 +109,10 @@ export async function fetchNewsByHash(hash: string) {
 /** Recupera le ultime notizie inserite */
 export async function fetchLatestNews({
   limit = 7,
-  categoryId
+  categoryId,
 }: {
   limit?: number;
-  categoryId?: string
+  categoryId?: string;
 } = {}) {
   try {
     let query = supabaseServer
@@ -128,7 +151,7 @@ export async function fetchUserBookmarkHashes(): Promise<Set<string>> {
 
 /**
  * Configurazione categorie per il frontend.
- * NB: rimossa "fantacalcio" come richiesto.
+ * Rimossa "fantacalcio" come richiesto.
  */
 export async function fetchCategories() {
   return [
@@ -156,7 +179,6 @@ export async function fetchCategoryCounts(): Promise<Map<string, number>> {
 
     (data || []).forEach((row) => {
       const catId = String(row.category_id || '').toLowerCase().trim();
-      // Escludi fantacalcio dai conteggi visibili (resta nel DB ma non mostrato)
       if (catId && catId !== 'fantacalcio') {
         counts.set(catId, (counts.get(catId) || 0) + 1);
         total++;
